@@ -1,0 +1,263 @@
+"""
+orchestration/daily_pipeline.py
+---------------------------------
+Daily pipeline orchestrator with explicit state tracking, retry support,
+stale-data detection, and daily summary artifact generation.
+
+Pipeline run states:
+  pending        — job created, not yet started
+  running        — job is actively executing
+  success        — job completed with no errors
+  partial_failure — job completed but with non-critical warnings
+  failed         — job raised an unrecoverable error
+  skipped        — job was not attempted (hard-dep upstream failed)
+
+The top-level DailyPipelineRun status reflects the worst job outcome:
+  all success              → success
+  any soft-job failed      → partial_failure
+  any hard-dep failed      → failed
+
+Usage:
+    python -m orchestration.daily_pipeline
+    python -m orchestration.daily_pipeline --triggered-by cron
+    make pipeline
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+import time
+from datetime import date, datetime, timezone
+
+from loguru import logger
+
+from config.settings import get_settings
+from db.models.daily_pipeline_runs import DailyPipelineRun
+from db.models.pipeline_runs import PipelineRun
+from db.session import db_session
+from orchestration.jobs import (
+    build_features,
+    generate_recommendations,
+    ingest_afl,
+    ingest_tab_odds,
+    settle_results,
+)
+from orchestration.jobs import check_data_freshness, generate_daily_summary
+from orchestration.pipeline_state import JobResult, JobSpec, run_job_with_retry
+
+settings = get_settings()
+
+# ---------------------------------------------------------------------------
+# Job registry
+# ---------------------------------------------------------------------------
+# Order matters. hard_dep=True means a failure in this job will cause all
+# subsequent hard_dep jobs to be skipped.
+
+DAILY_JOBS: list[JobSpec] = [
+    # Pre-flight: data freshness check (soft — never blocks the pipeline)
+    JobSpec(name="check_data_freshness", module=check_data_freshness, hard_dep=False, can_retry=False),
+
+    # Ingestion (hard deps — recommendations are meaningless without fresh data)
+    JobSpec(name="ingest_afl", module=ingest_afl, hard_dep=True, can_retry=True),
+    JobSpec(name="ingest_tab_odds", module=ingest_tab_odds, hard_dep=True, can_retry=True),
+
+    # Feature build (hard dep — predictions require features)
+    JobSpec(name="build_features", module=build_features, hard_dep=True, can_retry=False),
+
+    # Downstream (soft — stale or empty output is unfortunate but not fatal)
+    JobSpec(name="generate_recommendations", module=generate_recommendations, hard_dep=False, can_retry=False),
+    JobSpec(name="settle_results", module=settle_results, hard_dep=False, can_retry=False),
+
+    # Summary artifact (soft — failure just means no JSON file for today)
+    JobSpec(name="generate_daily_summary", module=generate_daily_summary, hard_dep=False, can_retry=False),
+]
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator
+# ---------------------------------------------------------------------------
+
+def run_pipeline(triggered_by: str = "manual") -> bool:
+    """
+    Execute all daily jobs in order, persisting state to the database.
+
+    Args:
+        triggered_by: 'cron' | 'manual' — stored on the DailyPipelineRun record.
+
+    Returns:
+        True if overall status is 'success', False for partial_failure or failed.
+    """
+    wall_start = time.monotonic()
+    today = date.today()
+    logger.info(f"========== Daily pipeline starting [{today}] triggered_by={triggered_by} ==========")
+
+    # Create top-level daily run record
+    with db_session() as db:
+        daily_run = DailyPipelineRun(
+            run_date=today,
+            triggered_by=triggered_by,
+            status="running",
+            started_at=datetime.now(tz=timezone.utc),
+        )
+        db.add(daily_run)
+        db.flush()
+        daily_run_id = daily_run.id
+        logger.info(f"DailyPipelineRun id={daily_run_id} uuid={daily_run.run_uuid}")
+
+    # Inform summary job which run record to reference
+    generate_daily_summary.set_daily_run_id(daily_run_id)
+
+    # Execute jobs
+    results: list[JobResult] = _execute_jobs(daily_run_id)
+
+    # Determine overall status
+    overall_status = _derive_overall_status(results)
+
+    # Persist final daily run state
+    wall_duration = time.monotonic() - wall_start
+    with db_session() as db:
+        daily_run = db.get(DailyPipelineRun, daily_run_id)
+        if daily_run:
+            daily_run.status = overall_status
+            daily_run.completed_at = datetime.now(tz=timezone.utc)
+            daily_run.duration_seconds = round(wall_duration, 2)
+
+    logger.info(
+        f"========== Daily pipeline {overall_status.upper()} "
+        f"in {wall_duration:.1f}s ==========\n"
+        + _format_job_summary(results)
+    )
+    return overall_status == "success"
+
+
+def _execute_jobs(daily_run_id: int) -> list[JobResult]:
+    """
+    Run all jobs in order, skipping hard-dep jobs after a hard-dep failure.
+
+    Each job gets its own PipelineRun row written to the database.
+    """
+    results: list[JobResult] = []
+    hard_dep_failed = False
+
+    for spec in DAILY_JOBS:
+        # Check if this job should be skipped
+        if spec.hard_dep and hard_dep_failed:
+            result = JobResult(
+                job_name=spec.name,
+                status="skipped",
+                error_message="Skipped: upstream hard dependency failed.",
+            )
+            _persist_job_run(daily_run_id, spec.name, result)
+            results.append(result)
+            logger.info(f"[{spec.name}] SKIPPED (hard-dep chain broken)")
+            continue
+
+        # Run the job (with retry if configured)
+        logger.info(f"[{spec.name}] starting ...")
+        _write_pending_job_run(daily_run_id, spec.name)
+
+        result = run_job_with_retry(spec)
+        _persist_job_run(daily_run_id, spec.name, result)
+        results.append(result)
+
+        if result.status == "failed" and spec.hard_dep:
+            hard_dep_failed = True
+            logger.error(
+                f"[{spec.name}] HARD DEPENDENCY FAILED — "
+                "subsequent hard-dep jobs will be skipped."
+            )
+
+    return results
+
+
+def _write_pending_job_run(daily_run_id: int, job_name: str) -> None:
+    """Pre-create a PipelineRun row in 'running' state before the job starts."""
+    with db_session() as db:
+        row = PipelineRun(
+            daily_run_id=daily_run_id,
+            job_name=job_name,
+            status="running",
+            started_at=datetime.now(tz=timezone.utc),
+        )
+        db.add(row)
+
+
+def _persist_job_run(daily_run_id: int, job_name: str, result: JobResult) -> None:
+    """Update the most recent running PipelineRun for this job with final state."""
+    with db_session() as db:
+        # Find the most recent running row for this job/daily_run
+        row: PipelineRun | None = (
+            db.query(PipelineRun)
+            .filter(
+                PipelineRun.daily_run_id == daily_run_id,
+                PipelineRun.job_name == job_name,
+            )
+            .order_by(PipelineRun.id.desc())
+            .first()
+        )
+        if row is None:
+            # Skipped jobs may not have a pre-created row — create one now
+            row = PipelineRun(
+                daily_run_id=daily_run_id,
+                job_name=job_name,
+                started_at=datetime.now(tz=timezone.utc),
+            )
+            db.add(row)
+
+        row.status = result.status
+        row.completed_at = datetime.now(tz=timezone.utc)
+        row.duration_seconds = result.duration_seconds
+        row.records_processed = result.records_processed
+        row.retry_count = result.retry_count
+        row.error_message = result.error_message
+
+
+def _derive_overall_status(results: list[JobResult]) -> str:
+    """
+    Determine top-level status from individual job results.
+
+      all success           → "success"
+      any hard-dep failed   → "failed"
+      any soft job failed   → "partial_failure"
+      only skips + success  → "success" (hard dep failed in prev run, but this run was clean)
+    """
+    hard_dep_names = {spec.name for spec in DAILY_JOBS if spec.hard_dep}
+
+    for r in results:
+        if r.status == "failed" and r.job_name in hard_dep_names:
+            return "failed"
+
+    has_any_failure = any(r.status == "failed" for r in results)
+    if has_any_failure:
+        return "partial_failure"
+
+    return "success"
+
+
+def _format_job_summary(results: list[JobResult]) -> str:
+    lines = ["Job results:"]
+    for r in results:
+        retry_note = f" (retried {r.retry_count}x)" if r.retry_count else ""
+        dur = f" {r.duration_seconds:.1f}s" if r.duration_seconds is not None else ""
+        err = f" — {r.error_message}" if r.error_message else ""
+        lines.append(f"  {r.job_name:<30} {r.status.upper()}{retry_note}{dur}{err}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run the AFL daily pipeline.")
+    parser.add_argument(
+        "--triggered-by",
+        default="manual",
+        choices=["manual", "cron"],
+        help="Source that triggered this run (stored in DB).",
+    )
+    args = parser.parse_args()
+
+    success = run_pipeline(triggered_by=args.triggered_by)
+    sys.exit(0 if success else 1)

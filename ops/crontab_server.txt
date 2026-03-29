@@ -1,0 +1,30 @@
+# AFL Predict — server computer cron schedule
+# Install with:  crontab ops/crontab_server.txt
+#
+# All times are local server time. Adjust AEST offset as needed.
+# AEST = UTC+10 / AEDT = UTC+11 (daylight saving)
+#
+# Assumptions:
+#   - Project root is /opt/afl_predict (adjust PROJECT_DIR as needed)
+#   - Python venv at /opt/afl_predict/.venv
+#   - Logs written to /opt/afl_predict/logs/
+
+SHELL=/bin/bash
+PROJECT_DIR=/opt/afl_predict
+PYTHON=/opt/afl_predict/.venv/bin/python
+LOG_DIR=/opt/afl_predict/logs
+
+# --- Daily pipeline at 08:00 AEST (22:00 UTC previous day) ---
+# Runs: freshness check → ingest AFL → ingest odds → build features
+#       → recommendations → settle results → daily summary
+0 22 * * * cd $PROJECT_DIR && $PYTHON -m orchestration.daily_pipeline --triggered-by cron >> $LOG_DIR/pipeline.log 2>&1
+
+# --- Weekly model retraining: Sunday 02:00 AEST (Saturday 16:00 UTC) ---
+# Runs on a separate schedule so daily pipeline is not slowed by training.
+0 16 * * 6 cd $PROJECT_DIR && $PYTHON -m orchestration.jobs.train_models >> $LOG_DIR/train_models.log 2>&1
+
+# --- Weekly backtest report: Monday 03:00 AEST (Sunday 17:00 UTC) ---
+0 17 * * 0 cd $PROJECT_DIR && $PYTHON -m orchestration.jobs.run_backtest >> $LOG_DIR/backtest.log 2>&1
+
+# --- Log rotation (keep last 30 days of log files) ---
+0 0 * * * find $LOG_DIR -name "*.log" -mtime +30 -delete
