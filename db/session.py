@@ -51,6 +51,10 @@ def db_session() -> Generator[Session, None, None]:
         db.close()
 
 
+# Alias for scripts that import get_session
+get_session = get_db
+
+
 def create_all_tables() -> None:
     """Create all tables defined in ORM models. Used for local dev / testing."""
     from db.base import Base  # noqa: F401 — import models to register them

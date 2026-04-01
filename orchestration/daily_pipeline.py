@@ -246,6 +246,18 @@ def _format_job_summary(results: list[JobResult]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Class wrapper (for import compatibility)
+# ---------------------------------------------------------------------------
+
+
+class DailyPipeline:
+    """Thin wrapper around run_pipeline() for import compatibility."""
+
+    def run(self, triggered_by: str = "manual") -> bool:
+        return run_pipeline(triggered_by=triggered_by)
+
+
+# ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
 

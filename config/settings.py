@@ -114,8 +114,26 @@ class Settings(BaseSettings):
         description="Max hard-dep job failures allowed in last 7 days before readiness is blocked.",
     )
 
+    # --- Ensemble Weights ---
+    ensemble_weight_bookmaker: float = Field(default=0.30)
+    ensemble_weight_elo: float = Field(default=0.10)
+    ensemble_weight_xgboost: float = Field(default=0.35)
+    ensemble_weight_poisson: float = Field(default=0.25)
+
+    # --- Live Bankroll ---
+    live_initial_bankroll: float = Field(default=1000.0)
+
+    @property
+    def APP_ENV(self) -> str:
+        """Uppercase alias for app_env (convenience accessor)."""
+        return self.app_env.upper()
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return cached Settings instance. Call this everywhere instead of instantiating directly."""
     return Settings()
+
+
+# Module-level singleton — use get_settings() in new code for testability.
+settings = get_settings()
