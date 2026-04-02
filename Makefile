@@ -1,4 +1,4 @@
-.PHONY: help install serve pipeline pipeline-cron test test-fast lint format migrate db-init build-features backtest train-models freshness-check daily-summary readiness
+.PHONY: help install serve pipeline pipeline-cron test test-fast lint format migrate db-init build-features backtest train-models freshness-check daily-summary readiness today-summary
 
 help:
 	@echo ""
@@ -22,6 +22,7 @@ help:
 	@echo "  freshness-check  Check odds/fixture data freshness"
 	@echo "  daily-summary    Write today's summary artifact to storage/"
 	@echo "  readiness        Run live-readiness evaluation report"
+	@echo "  today-summary    Pretty-print today's daily summary artifact"
 	@echo ""
 
 install:
@@ -44,6 +45,9 @@ daily-summary:
 
 readiness:
 	python -m evaluation.live_readiness
+
+today-summary:
+	@python -c "import json, pathlib, datetime; p=pathlib.Path('storage/daily_summaries')/f\"{datetime.date.today()}.json\"; print(json.dumps(json.loads(p.read_text()), indent=2) if p.exists() else 'No summary found for today. Run: make daily-summary')"
 
 ingest-afl:
 	python -m orchestration.jobs.ingest_afl $(ARGS)
