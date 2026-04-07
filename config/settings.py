@@ -123,6 +123,17 @@ class Settings(BaseSettings):
     # --- Live Bankroll ---
     live_initial_bankroll: float = Field(default=1000.0)
 
+    # --- Telegram Notifications ---
+    # Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env to enable alerts.
+    # Get a bot token from @BotFather on Telegram.
+    # Get your chat ID by messaging @userinfobot.
+    telegram_bot_token: str = Field(default="", description="Telegram Bot API token")
+    telegram_chat_id: str = Field(default="", description="Target chat/channel ID for alerts")
+    telegram_enabled: bool = Field(
+        default=False,
+        description="Master switch for Telegram notifications. Set to true in .env once configured.",
+    )
+
     @property
     def APP_ENV(self) -> str:
         """Uppercase alias for app_env (convenience accessor)."""

@@ -30,8 +30,11 @@ from db.models.matches import Match
 from features.extractors.bookmaker import BookmakerExtractor
 from features.extractors.elo import EloExtractor
 from features.extractors.form import FormExtractor
+from features.extractors.odds_movement import OddsMovementExtractor
+from features.extractors.player_availability import PlayerAvailabilityExtractor
 from features.extractors.rest import RestDaysExtractor
 from features.extractors.venue import VenueExtractor
+from features.extractors.weather import WeatherExtractor
 from features.validators import check_leakage, check_null_rates, check_ranges
 
 
@@ -72,7 +75,10 @@ class DatasetBuilder:
             FormExtractor(window=self._form_window),
             RestDaysExtractor(),
             VenueExtractor(),
-            BookmakerExtractor(self._db),  # requires DB; runs last
+            BookmakerExtractor(self._db),           # requires DB
+            OddsMovementExtractor(self._db),        # requires DB; after BookmakerExtractor
+            PlayerAvailabilityExtractor(self._db),  # requires DB; player_lineups table
+            WeatherExtractor(self._db),             # requires DB; weather_snapshots table
         ]
 
         # Start with an empty feature store per match_id

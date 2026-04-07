@@ -25,6 +25,7 @@ from pathlib import Path
 import pandas as pd
 from loguru import logger
 
+from backtesting.bootstrap import BootstrapCI, bootstrap_metrics, format_ci
 from backtesting.metrics import WindowMetrics
 
 
@@ -54,6 +55,8 @@ class BacktestResult:
     window_results: list[dict] = field(default_factory=list)
     aggregate_metrics: dict[str, dict] = field(default_factory=dict)
     assumptions: list[str] = field(default_factory=list)
+    # Bootstrap CIs per model — populated by compute_bootstrap_cis()
+    bootstrap_cis: dict[str, dict] = field(default_factory=dict)
 
     # ---------------------------------------------------------------------------
     # Factory
@@ -111,7 +114,26 @@ class BacktestResult:
             window_results=data.get("window_results", []),
             aggregate_metrics=data.get("aggregate_metrics", {}),
             assumptions=data.get("assumptions", []),
+            bootstrap_cis=data.get("bootstrap_cis", {}),
         )
+
+    def compute_bootstrap_cis(
+        self,
+        bets_by_model: dict[str, list[dict]],
+        n_iter: int = 1000,
+    ) -> None:
+        """
+        Compute and store bootstrap CIs for each model.
+
+        Args:
+            bets_by_model: Dict of model_name → list of bet dicts.
+                           Each bet dict must have keys: profit, stake_fraction, won.
+            n_iter: Bootstrap iterations (default 1000).
+        """
+        for model_name, bets in bets_by_model.items():
+            ci: BootstrapCI = bootstrap_metrics(bets, n_iter=n_iter)
+            self.bootstrap_cis[model_name] = ci.to_dict()
+            logger.info(f"Bootstrap CI [{model_name}]:\n{format_ci(ci)}")
 
     def to_dict(self) -> dict:
         return {
@@ -124,6 +146,7 @@ class BacktestResult:
             "window_results": self.window_results,
             "aggregate_metrics": self.aggregate_metrics,
             "assumptions": self.assumptions,
+            "bootstrap_cis": self.bootstrap_cis,
         }
 
     # ---------------------------------------------------------------------------

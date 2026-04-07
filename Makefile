@@ -1,4 +1,4 @@
-.PHONY: help install serve pipeline pipeline-cron test test-fast lint format migrate db-init build-features backtest train-models freshness-check daily-summary readiness today-summary
+.PHONY: help install serve pipeline pipeline-cron test test-fast lint format migrate db-init build-features backtest train-models freshness-check daily-summary readiness today-summary notify clv fetch-weather fetch-player-stats
 
 help:
 	@echo ""
@@ -81,3 +81,15 @@ migrate:
 
 db-init:
 	python -c "from db.session import create_all_tables; create_all_tables(); print('Tables created.')"
+
+notify:
+	python -m orchestration.jobs.notify_bets
+
+fetch-weather:
+	python -m orchestration.jobs.fetch_weather $(ARGS)
+
+fetch-player-stats:
+	python -m orchestration.jobs.fetch_player_stats $(ARGS)
+
+clv:
+	python -c "from db.session import SessionLocal; from evaluation.clv_tracker import batch_clv, clv_summary, format_ci; db=SessionLocal(); r=batch_clv(db); print(clv_summary(r)); db.close()"

@@ -1,27 +1,79 @@
-# Core
-fastapi>=0.111.0
-uvicorn[standard]>=0.29.0
-pydantic>=2.7.0
-pydantic-settings>=2.2.0
+# =============================================================================
+# AFL Predict -- Python dependencies
+# =============================================================================
+# Python 3.11 required.
+# Works on collector node (RX 6600) and predictor node (RTX 5080).
+#
+# IMPORTANT: Install inside a virtual environment, NOT global pip.
+#   Windows: .\bootstrap.ps1     (creates .venv automatically)
+#   Linux:   bash bootstrap.sh   (creates .venv automatically)
+#
+# Manual venv setup:
+#   python -m venv .venv
+#   Windows: .\.venv\Scripts\activate
+#   Linux:   source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# GPU note (RTX 5080):
+#   xgboost>=2.0 auto-detects CUDA if CUDA Toolkit is installed.
+#   No extra GPU package needed -- falls back to CPU if CUDA absent.
+# =============================================================================
 
+# ---------------------------------------------------------------------------
+# Web framework
+# ---------------------------------------------------------------------------
+fastapi>=0.111.0,<1.0.0
+uvicorn[standard]>=0.29.0,<1.0.0    # includes websockets, httptools
+
+# ---------------------------------------------------------------------------
+# Configuration & validation
+# ---------------------------------------------------------------------------
+pydantic>=2.7.0,<3.0.0
+pydantic-settings>=2.2.0,<3.0.0
+python-dotenv>=1.0.0,<2.0.0
+
+# ---------------------------------------------------------------------------
 # Database
-sqlalchemy>=2.0.0
-alembic>=1.13.0
+# ---------------------------------------------------------------------------
+sqlalchemy>=2.0.0,<3.0.0
+alembic>=1.13.0,<2.0.0
 
-# HTTP / scraping
-httpx>=0.27.0
-beautifulsoup4>=4.12.0
+# ---------------------------------------------------------------------------
+# HTTP clients & scraping
+# ---------------------------------------------------------------------------
+httpx>=0.27.0,<1.0.0                # async-capable; all collectors + FastAPI tests
+requests>=2.31.0,<3.0.0             # sync fallback; some collectors
+tenacity>=8.3.0,<10.0.0             # retry logic for HTTP collectors
+beautifulsoup4>=4.12.0,<5.0.0       # HTML parsing (AFL Tables scraper)
+lxml>=5.2.0,<7.0.0                  # fast HTML/XML parser backend for bs4
 
-# Data / ML
-pandas>=2.2.0
-numpy>=1.26.0
-scikit-learn>=1.4.0
-xgboost>=2.0
-statsmodels>=0.14
-shap>=0.44
-# oddsharvester>=0.1  # not available on PyPI — install manually if needed
+# ---------------------------------------------------------------------------
+# Data processing
+# ---------------------------------------------------------------------------
+pandas>=2.2.0,<3.0.0
+numpy>=1.26.0,<3.0.0
+pyarrow>=14.0.0                     # parquet read/write; any version >=14 works
 
-# Utilities
-python-dotenv>=1.0.0
-loguru>=0.7.0
-tenacity>=8.3.0
+# ---------------------------------------------------------------------------
+# Machine learning
+# ---------------------------------------------------------------------------
+scikit-learn>=1.4.0,<2.0.0          # LogisticRegression, calibration, metrics
+xgboost>=2.0.0,<4.0.0               # XGBoostModel; auto-uses CUDA on RTX 5080
+statsmodels>=0.14.0,<1.0.0          # PoissonModel (GLM)
+scipy>=1.12.0,<2.0.0                # ensemble weight optimisation (L-BFGS-B)
+joblib>=1.3.0,<2.0.0                # model artifact save/load
+
+# ---------------------------------------------------------------------------
+# Explainability
+# ---------------------------------------------------------------------------
+shap>=0.44.0,<1.0.0                 # SHAP feature importance for XGBoost
+
+# ---------------------------------------------------------------------------
+# Visualisation
+# ---------------------------------------------------------------------------
+matplotlib>=3.8.0,<4.0.0            # bankroll curve, ROI charts
+
+# ---------------------------------------------------------------------------
+# Logging & utilities
+# ---------------------------------------------------------------------------
+loguru>=0.7.0,<1.0.0                # structured logging throughout pipeline

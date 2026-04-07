@@ -32,6 +32,7 @@ from db.models.pipeline_runs import PipelineRun
 from db.models.predictions import Prediction
 from db.models.recommendations import Recommendation
 from db.session import get_db
+from evaluation.clv_tracker import batch_clv, clv_summary
 from evaluation.live_readiness import evaluate as evaluate_readiness
 
 settings = get_settings()
@@ -304,6 +305,28 @@ def get_no_bet_days(days: int = 30, db: Session = Depends(get_db)) -> dict[str, 
         "no_bet_days": len(no_bet_days),
         "no_bet_day_dates": no_bet_days,
     }
+
+
+# ---------------------------------------------------------------------------
+# CLV (Closing Line Value)
+# ---------------------------------------------------------------------------
+
+@router.get("/clv")
+def get_clv_summary(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """
+    Closing Line Value summary across all settled recommendations.
+
+    CLV > 0 on average means the model is consistently finding better odds
+    than the market's final price — the strongest long-term edge signal.
+
+    Fields:
+      beat_closing_line : fraction of bets where CLV > 0 (target: >0.55)
+      avg_clv_pct       : mean CLV as % of closing probability (target: >0)
+      median_clv_pct    : median CLV% (robust to outlier games)
+    """
+    records = batch_clv(db)
+    summary = clv_summary(records)
+    return {"clv": summary}
 
 
 # ---------------------------------------------------------------------------
