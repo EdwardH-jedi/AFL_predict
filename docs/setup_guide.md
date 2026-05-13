@@ -1,3 +1,35 @@
+# AFL Predict — Setup Guide
+
+> **Fresh-clone TL;DR.** A new checkout pointed at an empty database
+> must be brought up via Alembic. Run these from the repo root after
+> creating your virtualenv and installing `requirements-dev.txt`:
+>
+> ```bash
+> # Windows (PowerShell)
+> copy .env.example .env
+> python -m alembic upgrade head
+> python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+> curl http://localhost:8000/health
+> ```
+>
+> ```bash
+> # Linux (bash)
+> cp .env.example .env
+> python -m alembic upgrade head
+> python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+> curl http://localhost:8000/health
+> ```
+>
+> `systemctl` (used in the Linux server steps further down) is **not**
+> available on Windows — use Task Scheduler or NSSM there instead.
+>
+> Do not run `make db-init` on a database you intend to migrate with
+> Alembic. The two flows produce overlapping DDL and will collide. For
+> anything beyond a quick throwaway, prefer `python -m alembic upgrade
+> head`.
+
+---
+
 # AFL Predict — 머신 셋업 가이드
 
 RX6600 서버와 RTX5080 워크스테이션 두 환경에서 AFL Predict를 실행하기 위한 단계별 가이드.
@@ -109,8 +141,8 @@ LOG_LEVEL=INFO
 ### Step 3: DB 초기화 및 마이그레이션
 
 ```bash
-# 가상환경 활성화 상태에서
-make db-init
+# 가상환경 활성화 상태에서 — Alembic으로 스키마 생성 + 최신 head 까지 업그레이드.
+# make db-init (Base.metadata.create_all) 와 섞어 쓰지 말 것. 둘 중 하나만 사용.
 make migrate
 ```
 

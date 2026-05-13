@@ -35,24 +35,37 @@ def upgrade() -> None:
         sa.Column("notes", sa.Text(), nullable=True),
     )
 
-    # Add daily_run_id FK to pipeline_runs
-    op.add_column(
-        "pipeline_runs",
-        sa.Column("daily_run_id", sa.Integer(),
-                  sa.ForeignKey("daily_pipeline_runs.id"), nullable=True, index=True),
-    )
-
-    # Add retry_count to pipeline_runs
-    op.add_column(
-        "pipeline_runs",
-        sa.Column("retry_count", sa.Integer(), nullable=False, server_default="0"),
-    )
+    # Add daily_run_id FK and retry_count to pipeline_runs. SQLite cannot
+    # ALTER constraints in place, so the FK column must be added via batch
+    # mode (copy-and-move). Indexes/FK names are explicit because batch mode
+    # requires every constraint and index to be named on SQLite.
+    with op.batch_alter_table("pipeline_runs") as batch_op:
+        batch_op.add_column(
+            sa.Column("daily_run_id", sa.Integer(), nullable=True),
+        )
+        batch_op.create_foreign_key(
+            "fk_pipeline_runs_daily_run_id_daily_pipeline_runs",
+            "daily_pipeline_runs",
+            ["daily_run_id"],
+            ["id"],
+        )
+        batch_op.create_index(
+            "ix_pipeline_runs_daily_run_id", ["daily_run_id"]
+        )
+        batch_op.add_column(
+            sa.Column("retry_count", sa.Integer(), nullable=False, server_default="0"),
+        )
 
     # Note: SQLite does not support ALTER COLUMN — status column length/values
     # are validated at the application layer, not enforced by the DB.
 
 
 def downgrade() -> None:
-    op.drop_column("pipeline_runs", "retry_count")
-    op.drop_column("pipeline_runs", "daily_run_id")
+    with op.batch_alter_table("pipeline_runs") as batch_op:
+        batch_op.drop_column("retry_count")
+        batch_op.drop_index("ix_pipeline_runs_daily_run_id")
+        batch_op.drop_constraint(
+            "fk_pipeline_runs_daily_run_id_daily_pipeline_runs", type_="foreignkey"
+        )
+        batch_op.drop_column("daily_run_id")
     op.drop_table("daily_pipeline_runs")
