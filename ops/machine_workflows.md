@@ -21,12 +21,23 @@ python --version
 `Python 3.11.x` 가 나와야 함. 아니면 python.org에서 3.11 설치.
 
 ### 2. 프로젝트 폴더 확인
-OneDrive로 공유되므로 두 머신 모두 같은 경로에 코드가 있어야 합니다.
-```
-C:\Users\user\OneDrive\바탕 화면\AFL_predict
-```
+
+| 머신 | 경로 |
+|------|------|
+| 서버 컴퓨터 (RX 6600) | `C:\Users\edwar\AFL_predict` |
+| 메인 컴퓨터 (RTX 5080) | `C:\Users\user\OneDrive\바탕 화면\AFL_predict` |
 
 ### 3. venv 생성 및 패키지 설치 (각 머신에서 독립적으로)
+
+**서버:**
+```cmd
+cd "C:\Users\edwar\AFL_predict"
+python -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+```
+
+**메인:**
 ```cmd
 cd "C:\Users\user\OneDrive\바탕 화면\AFL_predict"
 python -m venv .venv
@@ -73,7 +84,7 @@ host    afl_predict    afl_user    192.168.0.0/24    md5
 ### Step 3 — .env 파일 생성
 
 ```cmd
-cd "C:\Users\user\OneDrive\바탕 화면\AFL_predict"
+cd "C:\Users\edwar\AFL_predict"
 copy .env.example .env
 ```
 
@@ -107,14 +118,15 @@ TELEGRAM_ENABLED=false
 ### Step 4 — DB 스키마 초기화
 
 ```cmd
+cd "C:\Users\edwar\AFL_predict"
 .venv\Scripts\activate.bat
-pip install psycopg2-binary
 alembic upgrade head
 ```
 
 ### Step 5 — 초기 데이터 수집 (최초 1회)
 
 ```cmd
+cd "C:\Users\edwar\AFL_predict"
 .venv\Scripts\activate.bat
 
 rem AFL 픽스처 수집 (2022~현재)
@@ -146,7 +158,7 @@ python -m orchestration.jobs.fetch_player_stats --season 2025
 - 트리거: 매일 08:00
 - 동작: 프로그램/스크립트
   ```
-  C:\Users\user\OneDrive\바탕 화면\AFL_predict\.venv\Scripts\python.exe
+  C:\Users\edwar\AFL_predict\.venv\Scripts\python.exe
   ```
   인수:
   ```
@@ -154,7 +166,7 @@ python -m orchestration.jobs.fetch_player_stats --season 2025
   ```
   시작 위치:
   ```
-  C:\Users\user\OneDrive\바탕 화면\AFL_predict
+  C:\Users\edwar\AFL_predict
   ```
 
 **작업 2: 날씨 수집 (매일 07:00)**
@@ -165,33 +177,27 @@ python -m orchestration.jobs.fetch_player_stats --season 2025
   -m orchestration.jobs.fetch_weather
   ```
 
-**작업 3: 주간 모델 재학습 (일요일 03:00)**
-- 이름: `AFL_WeeklyTrain`
-- 트리거: 매주 일요일 03:00
-- 동작: 위와 동일, 인수:
-  ```
-  -m orchestration.jobs.train_models
-  ```
-
 > **팁:** 스케줄러 작업 → 우클릭 → "실행" 으로 즉시 테스트 가능.
+
+> **주의:** `train_models`는 서버가 아닌 메인 컴퓨터에 등록합니다. 피처 parquet가 메인 로컬에 저장되고 RTX 5080 CUDA를 사용해야 하기 때문입니다.
 
 ### Step 7 — API 서버 자동 시작
 
 시작 프로그램에 API 서버를 등록합니다.
 
-`C:\Users\user\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\` 에
+`C:\Users\edwar\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\` 에
 `start_afl_api.bat` 파일 생성:
 
 ```bat
 @echo off
-cd /d "C:\Users\user\OneDrive\바탕 화면\AFL_predict"
+cd /d "C:\Users\edwar\AFL_predict"
 call .venv\Scripts\activate.bat
 start /b uvicorn api.main:app --host 0.0.0.0 --port 8000 >> logs\api.log 2>&1
 ```
 
 로그 폴더 생성:
 ```cmd
-mkdir "C:\Users\user\OneDrive\바탕 화면\AFL_predict\logs"
+mkdir "C:\Users\edwar\AFL_predict\logs"
 ```
 
 ---
@@ -228,13 +234,60 @@ MIN_EDGE_THRESHOLD=0.03
 MAX_KELLY_FRACTION=0.05
 ```
 
-### Step 2 — psycopg2 설치 및 DB 접속 확인
+### Step 2 — DB 접속 확인
 
 ```cmd
 .venv\Scripts\activate.bat
-pip install psycopg2-binary
 python -c "from db.session import SessionLocal; db=SessionLocal(); print('DB connected OK'); db.close()"
 ```
+
+### Step 3 — Windows 작업 스케줄러 (자동 실행)
+
+> **전제:** 서버의 PostgreSQL이 켜져 있어야 합니다. 서버가 꺼지면 아래 모든 작업이 실패합니다.
+
+**작업 스케줄러 열기:** 시작 메뉴 → "작업 스케줄러" 검색
+
+아래 2개 작업을 등록합니다.
+
+**작업 1: 일일 파이프라인 — predictor (매일 09:00)**
+
+서버 collector 파이프라인(08:00)이 끝난 뒤 실행합니다.
+
+- 이름: `AFL_DailyPipeline_Predictor`
+- 트리거: 매일 09:00
+- 동작: 프로그램/스크립트
+  ```
+  C:\Users\user\OneDrive\바탕 화면\AFL_predict\.venv\Scripts\python.exe
+  ```
+  인수:
+  ```
+  -m orchestration.daily_pipeline --triggered-by cron
+  ```
+  시작 위치:
+  ```
+  C:\Users\user\OneDrive\바탕 화면\AFL_predict
+  ```
+
+실행 내용 (NODE_ROLE=predictor 기준):
+- `build_features` — DB에서 피처 읽어 parquet 저장
+- `generate_recommendations` — 모델 추론, 베팅 추천 생성
+- `notify_bets` — Discord/Telegram 알림
+- `settle_results` — 종료 경기 결과 정산
+
+**작업 2: 주간 모델 재학습 (일요일 04:00)**
+
+서버 날씨 수집(07:00) 전에 완료됩니다. 서버가 켜져 있어야 DB 저장 가능.
+
+- 이름: `AFL_WeeklyTrain`
+- 트리거: 매주 일요일 04:00
+- 동작: 위와 동일, 인수:
+  ```
+  -m orchestration.jobs.train_models
+  ```
+
+학습 결과는 `storage/model_artifacts/`(메인 로컬)에 저장되고, RTX 5080 CUDA가 자동 활성화됩니다.
+
+> **팁:** 스케줄러 작업 → 우클릭 → "실행" 으로 즉시 테스트 가능.
 
 ### Step 3 — CUDA 확인 (XGBoost GPU 가속)
 
@@ -271,6 +324,7 @@ python -m orchestration.jobs.run_backtest --mode expanding
 
 ### 서버 (RX 6600) 확인
 ```cmd
+cd "C:\Users\edwar\AFL_predict"
 .venv\Scripts\activate.bat
 
 rem 1. DB 연결

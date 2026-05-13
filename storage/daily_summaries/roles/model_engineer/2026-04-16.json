@@ -1,0 +1,353 @@
+{
+  "generated_at": "2026-04-16T02:25:34.808279+00:00",
+  "models": [
+    {
+      "model_name": "elo_baseline",
+      "model_version": "0.1",
+      "brier_score": 0.20533,
+      "log_loss": 0.59378,
+      "accuracy": 0.65,
+      "train_from_season": null,
+      "train_to_season": null,
+      "artifact_path": "storage\\model_artifacts\\elo_baseline_0.1.pkl",
+      "created_at": "2026-04-15T17:38:48",
+      "age_days": 0.37,
+      "stale": false,
+      "metadata_json": {
+        "name": "elo_baseline",
+        "version": "0.1",
+        "k_factor": 24.0,
+        "home_advantage": 50.0,
+        "season_regression": 0.7,
+        "n_teams": 18
+      }
+    },
+    {
+      "model_name": "xgboost",
+      "model_version": "0.1",
+      "brier_score": 0.20747,
+      "log_loss": 0.58903,
+      "accuracy": 0.7,
+      "train_from_season": null,
+      "train_to_season": null,
+      "artifact_path": "storage\\model_artifacts\\xgboost_0.1.pkl",
+      "created_at": "2026-04-15T17:38:48",
+      "age_days": 0.37,
+      "stale": false,
+      "metadata_json": {
+        "name": "xgboost",
+        "version": "0.1",
+        "n_estimators": 200,
+        "max_depth": 3,
+        "learning_rate": 0.1,
+        "n_features": 29,
+        "calibrated": true
+      }
+    },
+    {
+      "model_name": "logistic_baseline",
+      "model_version": "0.1",
+      "brier_score": 0.21107,
+      "log_loss": 0.60618,
+      "accuracy": 0.65,
+      "train_from_season": null,
+      "train_to_season": null,
+      "artifact_path": "storage\\model_artifacts\\logistic_baseline_0.1.pkl",
+      "created_at": "2026-04-15T17:38:48",
+      "age_days": 0.37,
+      "stale": false,
+      "metadata_json": {
+        "name": "logistic_baseline",
+        "version": "0.1",
+        "C": 1.0,
+        "max_iter": 1000,
+        "n_features": 29,
+        "calibrated": true
+      }
+    },
+    {
+      "model_name": "bookmaker_baseline",
+      "model_version": "0.1",
+      "brier_score": 0.23376,
+      "log_loss": 0.65656,
+      "accuracy": 0.675,
+      "train_from_season": null,
+      "train_to_season": null,
+      "artifact_path": null,
+      "created_at": "2026-04-15T17:38:48",
+      "age_days": 0.37,
+      "stale": false,
+      "metadata_json": {
+        "name": "bookmaker_baseline",
+        "version": "0.1"
+      }
+    },
+    {
+      "model_name": "poisson",
+      "model_version": "0.1",
+      "brier_score": 0.2362,
+      "log_loss": 0.6656,
+      "accuracy": 0.625,
+      "train_from_season": null,
+      "train_to_season": null,
+      "artifact_path": "storage\\model_artifacts\\poisson_0.1.pkl",
+      "created_at": "2026-04-15T17:38:49",
+      "age_days": 0.37,
+      "stale": false,
+      "metadata_json": {
+        "name": "poisson",
+        "version": "0.1",
+        "mode": "score",
+        "max_score": 200
+      }
+    }
+  ],
+  "recent_runs": [
+    {
+      "id": 112,
+      "model_name": "poisson",
+      "status": "completed",
+      "brier_score": 0.2362,
+      "log_loss": 0.6656,
+      "accuracy": 0.625,
+      "created_at": "2026-04-15T17:38:49",
+      "completed_at": "2026-04-15T17:38:50.042743"
+    },
+    {
+      "id": 108,
+      "model_name": "bookmaker_baseline",
+      "status": "completed",
+      "brier_score": 0.23376,
+      "log_loss": 0.65656,
+      "accuracy": 0.675,
+      "created_at": "2026-04-15T17:38:48",
+      "completed_at": "2026-04-15T17:38:48.796429"
+    },
+    {
+      "id": 109,
+      "model_name": "elo_baseline",
+      "status": "completed",
+      "brier_score": 0.20533,
+      "log_loss": 0.59378,
+      "accuracy": 0.65,
+      "created_at": "2026-04-15T17:38:48",
+      "completed_at": "2026-04-15T17:38:48.841003"
+    },
+    {
+      "id": 110,
+      "model_name": "logistic_baseline",
+      "status": "completed",
+      "brier_score": 0.21107,
+      "log_loss": 0.60618,
+      "accuracy": 0.65,
+      "created_at": "2026-04-15T17:38:48",
+      "completed_at": "2026-04-15T17:38:48.858589"
+    },
+    {
+      "id": 111,
+      "model_name": "xgboost",
+      "status": "completed",
+      "brier_score": 0.20747,
+      "log_loss": 0.58903,
+      "accuracy": 0.7,
+      "created_at": "2026-04-15T17:38:48",
+      "completed_at": "2026-04-15T17:38:49.153219"
+    },
+    {
+      "id": 103,
+      "model_name": "bookmaker_baseline",
+      "status": "completed",
+      "brier_score": 0.23938,
+      "log_loss": 0.66954,
+      "accuracy": 0.63636,
+      "created_at": "2026-04-11T17:00:06",
+      "completed_at": "2026-04-11T17:00:06.072548"
+    },
+    {
+      "id": 104,
+      "model_name": "elo_baseline",
+      "status": "completed",
+      "brier_score": 0.21828,
+      "log_loss": 0.62373,
+      "accuracy": 0.60606,
+      "created_at": "2026-04-11T17:00:06",
+      "completed_at": "2026-04-11T17:00:06.115111"
+    },
+    {
+      "id": 105,
+      "model_name": "logistic_baseline",
+      "status": "completed",
+      "brier_score": 0.20132,
+      "log_loss": 0.58015,
+      "accuracy": 0.69697,
+      "created_at": "2026-04-11T17:00:06",
+      "completed_at": "2026-04-11T17:00:06.140032"
+    },
+    {
+      "id": 106,
+      "model_name": "xgboost",
+      "status": "completed",
+      "brier_score": 0.20972,
+      "log_loss": 0.59055,
+      "accuracy": 0.63636,
+      "created_at": "2026-04-11T17:00:06",
+      "completed_at": "2026-04-11T17:00:06.421084"
+    },
+    {
+      "id": 107,
+      "model_name": "poisson",
+      "status": "completed",
+      "brier_score": 0.24256,
+      "log_loss": 0.67882,
+      "accuracy": 0.60606,
+      "created_at": "2026-04-11T17:00:06",
+      "completed_at": "2026-04-11T17:00:07.203490"
+    },
+    {
+      "id": 102,
+      "model_name": "poisson",
+      "status": "completed",
+      "brier_score": 0.24256,
+      "log_loss": 0.67882,
+      "accuracy": 0.60606,
+      "created_at": "2026-04-11T01:56:51",
+      "completed_at": "2026-04-11T01:56:51.432874"
+    },
+    {
+      "id": 98,
+      "model_name": "bookmaker_baseline",
+      "status": "completed",
+      "brier_score": 0.23938,
+      "log_loss": 0.66954,
+      "accuracy": 0.63636,
+      "created_at": "2026-04-11T01:56:50",
+      "completed_at": "2026-04-11T01:56:50.920225"
+    },
+    {
+      "id": 99,
+      "model_name": "elo_baseline",
+      "status": "completed",
+      "brier_score": 0.21828,
+      "log_loss": 0.62373,
+      "accuracy": 0.60606,
+      "created_at": "2026-04-11T01:56:50",
+      "completed_at": "2026-04-11T01:56:50.963225"
+    },
+    {
+      "id": 100,
+      "model_name": "logistic_baseline",
+      "status": "completed",
+      "brier_score": 0.20132,
+      "log_loss": 0.58015,
+      "accuracy": 0.69697,
+      "created_at": "2026-04-11T01:56:50",
+      "completed_at": "2026-04-11T01:56:50.987225"
+    },
+    {
+      "id": 101,
+      "model_name": "xgboost",
+      "status": "completed",
+      "brier_score": 0.20972,
+      "log_loss": 0.59055,
+      "accuracy": 0.63636,
+      "created_at": "2026-04-11T01:56:50",
+      "completed_at": "2026-04-11T01:56:51.204226"
+    },
+    {
+      "id": 93,
+      "model_name": "bookmaker_baseline",
+      "status": "completed",
+      "brier_score": 0.24297,
+      "log_loss": 0.67688,
+      "accuracy": 0.625,
+      "created_at": "2026-04-11T01:50:39",
+      "completed_at": "2026-04-11T01:50:39.656825"
+    },
+    {
+      "id": 94,
+      "model_name": "elo_baseline",
+      "status": "completed",
+      "brier_score": 0.21467,
+      "log_loss": 0.61627,
+      "accuracy": 0.625,
+      "created_at": "2026-04-11T01:50:39",
+      "completed_at": "2026-04-11T01:50:39.699826"
+    },
+    {
+      "id": 95,
+      "model_name": "logistic_baseline",
+      "status": "completed",
+      "brier_score": 0.20096,
+      "log_loss": 0.57893,
+      "accuracy": 0.6875,
+      "created_at": "2026-04-11T01:50:39",
+      "completed_at": "2026-04-11T01:50:39.721826"
+    },
+    {
+      "id": 96,
+      "model_name": "xgboost",
+      "status": "completed",
+      "brier_score": 0.21402,
+      "log_loss": 0.60374,
+      "accuracy": 0.65625,
+      "created_at": "2026-04-11T01:50:39",
+      "completed_at": "2026-04-11T01:50:39.946117"
+    },
+    {
+      "id": 97,
+      "model_name": "poisson",
+      "status": "completed",
+      "brier_score": 0.2362,
+      "log_loss": 0.6656,
+      "accuracy": 0.625,
+      "created_at": "2026-04-11T01:50:39",
+      "completed_at": "2026-04-11T01:50:40.173228"
+    }
+  ],
+  "leaderboard": [
+    {
+      "rank": 1,
+      "model_name": "elo_baseline",
+      "brier_score": 0.20533,
+      "log_loss": 0.59378,
+      "accuracy": 0.65,
+      "age_days": 0.37
+    },
+    {
+      "rank": 2,
+      "model_name": "xgboost",
+      "brier_score": 0.20747,
+      "log_loss": 0.58903,
+      "accuracy": 0.7,
+      "age_days": 0.37
+    },
+    {
+      "rank": 3,
+      "model_name": "logistic_baseline",
+      "brier_score": 0.21107,
+      "log_loss": 0.60618,
+      "accuracy": 0.65,
+      "age_days": 0.37
+    },
+    {
+      "rank": 4,
+      "model_name": "bookmaker_baseline",
+      "brier_score": 0.23376,
+      "log_loss": 0.65656,
+      "accuracy": 0.675,
+      "age_days": 0.37
+    },
+    {
+      "rank": 5,
+      "model_name": "poisson",
+      "brier_score": 0.2362,
+      "log_loss": 0.6656,
+      "accuracy": 0.625,
+      "age_days": 0.37
+    }
+  ],
+  "verdict": "warn",
+  "warnings": [
+    "Required models not yet trained: ['ensemble']."
+  ]
+}

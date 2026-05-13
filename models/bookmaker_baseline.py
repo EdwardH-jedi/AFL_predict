@@ -52,4 +52,4 @@ class BookmakerBaseline(BaseModel):
         if (prob_sum - 1.0).abs().max() > 0.01:
             logger.warning("BookmakerBaseline: probabilities do not sum to 1.0 — check inputs.")
 
-        return result.reset_index(drop=True)
+        return result

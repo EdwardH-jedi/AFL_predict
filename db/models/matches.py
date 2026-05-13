@@ -16,7 +16,8 @@ class Match(Base):
     # Season / round context
     season: Mapped[int] = mapped_column(SmallInteger, nullable=False, index=True)
     round_number: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    round_label: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "Round 5", "Finals Week 1"
+    # e.g. "Round 5", "Finals Week 1"
+    round_label: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Teams
     home_team_id: Mapped[int] = mapped_column(Integer, ForeignKey("teams.id"), nullable=False)
@@ -34,6 +35,11 @@ class Match(Base):
 
     # Finals flag — informs model features and evaluation
     is_final: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # True when the API-designated home team is NOT at their registered home ground
+    # (Gather Round, neutral interstate venues, MCG finals for non-Melbourne teams).
+    # ELO home advantage should be zeroed for these matches.
+    is_neutral_venue: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # External reference ID from data source (for deduplication)
     external_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)

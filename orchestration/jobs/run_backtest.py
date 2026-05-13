@@ -30,9 +30,13 @@ from loguru import logger
 
 from backtesting.runner import BacktestRunner
 from config.settings import get_settings
+import json
+
 from models.bookmaker_baseline import BookmakerBaseline
 from models.elo_baseline import EloBaseline
 from models.logistic_baseline import LogisticBaseline
+from models.xgboost_model import XGBoostModel
+from models.poisson_model import PoissonModel
 
 settings = get_settings()
 FEATURES_DIR = Path(settings.raw_snapshots_dir) / "features"
@@ -70,10 +74,28 @@ def run(
         logger.error("run_backtest: no feature data. Run build_features first.")
         return
 
+    # Load tuned hyperparameters
+    artifacts_dir = Path(settings.model_artifacts_dir)
+    elo_params = _load_json_params(artifacts_dir / "elo_best_params.json",
+                                   defaults={"k_factor": 24.0, "home_advantage": 50.0, "season_regression": 0.70})
+    xgb_params = _load_json_params(artifacts_dir / "xgb_best_params.json",
+                                   defaults={"max_depth": 3, "learning_rate": 0.1, "n_estimators": 200, "subsample": 0.8})
+
     models = [
         BookmakerBaseline(),
-        EloBaseline(),
+        EloBaseline(
+            k_factor=elo_params["k_factor"],
+            home_advantage=elo_params["home_advantage"],
+            season_regression=elo_params["season_regression"],
+        ),
         LogisticBaseline(),
+        XGBoostModel(
+            max_depth=int(xgb_params["max_depth"]),
+            learning_rate=xgb_params["learning_rate"],
+            n_estimators=int(xgb_params["n_estimators"]),
+            subsample=xgb_params["subsample"],
+        ),
+        PoissonModel(),
     ]
 
     runner = BacktestRunner(
@@ -91,7 +113,7 @@ def run(
     duration = time.monotonic() - start
     logger.info(f"==> run_backtest: completed in {duration:.1f}s — results at {path}")
 
-    # Print summary table to stdout as well
+    # Print aggregate summary
     agg = result.aggregate_df()
     if not agg.empty:
         _key_cols = [
@@ -100,7 +122,32 @@ def run(
             "n_bets_total", "hit_rate", "avg_edge", "roi",
         ]
         display_cols = [c for c in _key_cols if c in agg.columns]
-        print("\n" + agg[display_cols].to_string(index=False))
+        print("\n=== Aggregate (all seasons) ===")
+        print(agg[display_cols].to_string(index=False))
+
+    # Print per-season breakdown for the two best models
+    fold_df = result.summary_df()
+    if not fold_df.empty:
+        _fold_cols = ["fold_label", "model_name", "n_settled", "brier_score", "accuracy", "n_bets", "roi"]
+        fold_display = [c for c in _fold_cols if c in fold_df.columns]
+        # Show logistic and xgboost per-season
+        best_models = ["logistic_baseline", "xgboost", "elo_baseline"]
+        fold_subset = fold_df[fold_df["model_name"].isin(best_models)][fold_display]
+        if not fold_subset.empty:
+            print("\n=== Per-season breakdown (selected models) ===")
+            print(fold_subset.sort_values(["fold_label", "model_name"]).to_string(index=False))
+
+
+def _load_json_params(path: Path, defaults: dict) -> dict:
+    """Load hyperparams from JSON, falling back to defaults if file missing."""
+    try:
+        with open(path) as f:
+            params = json.load(f)
+        logger.info(f"run_backtest: loaded params from {path}: {params}")
+        return params
+    except FileNotFoundError:
+        logger.warning(f"run_backtest: {path} not found, using defaults {defaults}")
+        return defaults
 
 
 def _load_latest_features():

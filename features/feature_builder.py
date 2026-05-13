@@ -20,8 +20,6 @@ Usage:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pandas as pd
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -30,10 +28,13 @@ from db.models.matches import Match
 from features.extractors.bookmaker import BookmakerExtractor
 from features.extractors.elo import EloExtractor
 from features.extractors.form import FormExtractor
+from features.extractors.h2h import H2HExtractor
 from features.extractors.odds_movement import OddsMovementExtractor
 from features.extractors.player_availability import PlayerAvailabilityExtractor
 from features.extractors.rest import RestDaysExtractor
+from features.extractors.travel import TravelExtractor
 from features.extractors.venue import VenueExtractor
+from features.extractors.venue_performance import VenuePerformanceExtractor
 from features.extractors.weather import WeatherExtractor
 from features.validators import check_leakage, check_null_rates, check_ranges
 
@@ -72,13 +73,16 @@ class DatasetBuilder:
         # --- Run extractors (each does a single pass over all_matches) ---
         extractors = [
             EloExtractor(),
-            FormExtractor(window=self._form_window),
+            FormExtractor(window=self._form_window),  # now emits L3/L5/L10 + momentum
+            H2HExtractor(),
             RestDaysExtractor(),
+            TravelExtractor(),                        # stateless; no DB needed
             VenueExtractor(),
-            BookmakerExtractor(self._db),           # requires DB
-            OddsMovementExtractor(self._db),        # requires DB; after BookmakerExtractor
-            PlayerAvailabilityExtractor(self._db),  # requires DB; player_lineups table
-            WeatherExtractor(self._db),             # requires DB; weather_snapshots table
+            VenuePerformanceExtractor(),
+            BookmakerExtractor(self._db),             # requires DB
+            OddsMovementExtractor(self._db),          # requires DB; after BookmakerExtractor
+            PlayerAvailabilityExtractor(self._db),    # requires DB; player_lineups table
+            WeatherExtractor(self._db),               # requires DB; weather_snapshots table
         ]
 
         # Start with an empty feature store per match_id
@@ -91,7 +95,6 @@ class DatasetBuilder:
                 features[match_id].update(row)
 
         # --- Merge with match metadata and target ---
-        match_index = {m.id: m for m in all_matches}
         rows: list[dict] = []
         leakage_count = 0
         range_violation_count = 0
@@ -111,6 +114,10 @@ class DatasetBuilder:
                 "match_time": match.match_time,
                 "is_final": match.is_final,
                 "home_win": _target(match),
+                # Score columns: populated for settled matches, None for upcoming.
+                # Used by PoissonModel score-mode training only — not model features.
+                "home_score": match.home_score,
+                "away_score": match.away_score,
                 **feat,
             }
 

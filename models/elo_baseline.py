@@ -54,9 +54,11 @@ class EloBaseline(BaseModel):
         self,
         k_factor: float = DEFAULT_K,
         home_advantage: float = DEFAULT_HOME_ADVANTAGE,
+        season_regression: float = SEASON_REGRESSION,
     ) -> None:
         self.k_factor = k_factor
         self.home_advantage = home_advantage
+        self.season_regression = season_regression
         self.ratings: dict[int, float] = {}  # {team_id: elo}
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
@@ -104,7 +106,8 @@ class EloBaseline(BaseModel):
         """Predict win probabilities using current ELO ratings."""
         required = {"match_id", "home_team_id", "away_team_id"}
         if not required.issubset(X.columns):
-            raise ValueError(f"EloBaseline.predict_proba: missing columns {required - set(X.columns)}")
+            missing = required - set(X.columns)
+            raise ValueError(f"EloBaseline.predict_proba: missing columns {missing}")
 
         results = []
         for _, row in X.iterrows():
@@ -119,12 +122,17 @@ class EloBaseline(BaseModel):
                 "away_win_prob": round(1.0 - home_prob, 6),
             })
 
-        return pd.DataFrame(results)
+        return pd.DataFrame(results, index=X.index)
 
     def save(self, artifacts_dir: str | Path) -> Path:
         path = Path(artifacts_dir) / f"{self.name}_{self.version}.pkl"
         with open(path, "wb") as f:
-            pickle.dump({"ratings": self.ratings, "k": self.k_factor, "ha": self.home_advantage}, f)
+            pickle.dump({
+                "ratings": self.ratings,
+                "k": self.k_factor,
+                "ha": self.home_advantage,
+                "season_regression": self.season_regression,
+            }, f)
         logger.info(f"EloBaseline saved to {path}")
         return path
 
@@ -135,6 +143,8 @@ class EloBaseline(BaseModel):
         self.ratings = data["ratings"]
         self.k_factor = data["k"]
         self.home_advantage = data["ha"]
+        # Old artifacts may not have season_regression stored — fall back to current default
+        self.season_regression = data.get("season_regression", self.season_regression)
         logger.info(f"EloBaseline loaded from {path}")
 
     def metadata(self) -> dict[str, Any]:
@@ -142,6 +152,7 @@ class EloBaseline(BaseModel):
             **super().metadata(),
             "k_factor": self.k_factor,
             "home_advantage": self.home_advantage,
+            "season_regression": self.season_regression,
             "n_teams": len(self.ratings),
         }
 
@@ -154,6 +165,6 @@ class EloBaseline(BaseModel):
         """Regress all team ratings towards the mean at the start of a new season."""
         mean = np.mean(list(self.ratings.values())) if self.ratings else INITIAL_RATING
         self.ratings = {
-            team_id: rating + SEASON_REGRESSION * (mean - rating)
+            team_id: rating + self.season_regression * (mean - rating)
             for team_id, rating in self.ratings.items()
         }

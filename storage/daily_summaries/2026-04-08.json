@@ -1,0 +1,94 @@
+{
+  "date": "2026-04-08",
+  "generated_at": "2026-04-07T16:50:23.985486+00:00",
+  "pipeline": {
+    "status": "running",
+    "run_uuid": "bc3c84bf-3986-411b-ac0c-faf23badfac4",
+    "triggered_by": "cron",
+    "started_at": "2026-04-07T16:50:11.131392",
+    "completed_at": null,
+    "duration_seconds": null,
+    "jobs": [
+      {
+        "name": "check_data_freshness",
+        "status": "success",
+        "duration_seconds": 0.02,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "ingest_afl",
+        "status": "success",
+        "duration_seconds": 2.97,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "ingest_tab_odds",
+        "status": "success",
+        "duration_seconds": 1.09,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "build_features",
+        "status": "success",
+        "duration_seconds": 4.61,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "generate_recommendations",
+        "status": "success",
+        "duration_seconds": 4.06,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "settle_results",
+        "status": "success",
+        "duration_seconds": 0.01,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "generate_daily_summary",
+        "status": "running",
+        "duration_seconds": null,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      }
+    ]
+  },
+  "freshness": {
+    "odds_age_hours": 0.15,
+    "odds_stale": false,
+    "afl_age_hours": 0.24,
+    "afl_stale": false,
+    "upcoming_without_odds": 163,
+    "warnings": [
+      "163 upcoming match(es) have no odds snapshot."
+    ],
+    "checked_at": "2026-04-07T16:50:11.160949+00:00"
+  },
+  "recommendations": [],
+  "bankroll": {
+    "current_balance": null,
+    "peak_balance": null,
+    "drawdown": null,
+    "n_events": 0
+  },
+  "recent_outcomes": [],
+  "no_bet_day": {
+    "is_no_bet_day": true,
+    "reason": "No recommendations generated today (edge below threshold or no upcoming matches).",
+    "today_rec_count": 0
+  }
+}

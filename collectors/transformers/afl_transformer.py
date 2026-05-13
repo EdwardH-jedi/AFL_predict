@@ -17,6 +17,7 @@ Why a separate layer?
 from __future__ import annotations
 
 from collectors.parsers.squiggle_parser import ParsedGame, ParsedTeam
+from collectors.venue_rules import is_neutral_venue as _is_neutral
 
 
 def team_to_kwargs(team: ParsedTeam) -> dict:
@@ -61,6 +62,7 @@ def game_to_match_kwargs(
         "venue": game.venue,
         "external_id": game.external_id,
         "is_final": game.is_final,
+        "is_neutral_venue": _is_neutral(game.home_team_name, game.venue),
     }
 
     if game.is_complete:
@@ -101,4 +103,5 @@ def game_to_schedule_kwargs(game: ParsedGame) -> dict:
         "match_time": game.match_time,
         "venue": game.venue,
         "round_label": game.round_label,
+        "is_neutral_venue": _is_neutral(game.home_team_name, game.venue),
     }

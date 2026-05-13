@@ -33,7 +33,10 @@ class VenueExtractor(BaseExtractor):
 
     def extract(self, matches: list[Match]) -> dict[int, dict]:
         result = {
-            match.id: {"venue": match.venue}
+            match.id: {
+                "venue": match.venue,
+                "is_neutral_venue": int(getattr(match, "is_neutral_venue", False)),
+            }
             for match in matches
         }
         logger.debug(f"VenueExtractor: extracted venue for {len(result)} matches.")

@@ -1,0 +1,241 @@
+{
+  "date": "2026-04-11",
+  "generated_at": "2026-04-11T01:53:08.673831+00:00",
+  "pipeline": {
+    "status": "running",
+    "run_uuid": "e5f93d7a-20c8-4acf-8c68-b1d806febe10",
+    "triggered_by": "cron",
+    "started_at": "2026-04-11T01:52:55.299990",
+    "completed_at": null,
+    "duration_seconds": null,
+    "jobs": [
+      {
+        "name": "check_data_freshness",
+        "status": "success",
+        "duration_seconds": 0.0,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "ingest_afl",
+        "status": "success",
+        "duration_seconds": 2.91,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "ingest_tab_odds",
+        "status": "success",
+        "duration_seconds": 0.92,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "build_features",
+        "status": "success",
+        "duration_seconds": 4.55,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "generate_recommendations",
+        "status": "success",
+        "duration_seconds": 4.25,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "notify_bets",
+        "status": "success",
+        "duration_seconds": 0.53,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "settle_results",
+        "status": "success",
+        "duration_seconds": 0.06,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "generate_daily_summary",
+        "status": "running",
+        "duration_seconds": null,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      }
+    ]
+  },
+  "freshness": {
+    "odds_age_hours": 16.75,
+    "odds_stale": false,
+    "afl_age_hours": 16.75,
+    "afl_stale": false,
+    "upcoming_without_odds": 163,
+    "warnings": [
+      "163 upcoming match(es) have no odds snapshot."
+    ],
+    "checked_at": "2026-04-11T01:52:55.326988+00:00"
+  },
+  "recommendations": [
+    {
+      "rec_id": 84,
+      "match_id": 2286,
+      "home_team": 12,
+      "away_team": 2,
+      "match_date": "2026-04-11T02:35:00",
+      "side": "home",
+      "odds": 6.5,
+      "stake_fraction": 0.05,
+      "status": "pending",
+      "paper_trade": true,
+      "created_at": "2026-04-11T01:53:07"
+    },
+    {
+      "rec_id": 85,
+      "match_id": 2287,
+      "home_team": 5,
+      "away_team": 11,
+      "match_date": "2026-04-11T03:15:00",
+      "side": "home",
+      "odds": 4.1,
+      "stake_fraction": 0.04287616129032255,
+      "status": "pending",
+      "paper_trade": true,
+      "created_at": "2026-04-11T01:53:07"
+    },
+    {
+      "rec_id": 86,
+      "match_id": 2290,
+      "home_team": 7,
+      "away_team": 17,
+      "match_date": "2026-04-12T02:30:00",
+      "side": "home",
+      "odds": 1.08,
+      "stake_fraction": 0.0,
+      "status": "pending",
+      "paper_trade": true,
+      "created_at": "2026-04-11T01:53:07"
+    },
+    {
+      "rec_id": 87,
+      "match_id": 2292,
+      "home_team": 13,
+      "away_team": 15,
+      "match_date": "2026-04-12T09:15:00",
+      "side": "home",
+      "odds": 2.2,
+      "stake_fraction": 0.05,
+      "status": "pending",
+      "paper_trade": true,
+      "created_at": "2026-04-11T01:53:07"
+    },
+    {
+      "rec_id": 80,
+      "match_id": 2286,
+      "home_team": 12,
+      "away_team": 2,
+      "match_date": "2026-04-11T02:35:00",
+      "side": "home",
+      "odds": 6.5,
+      "stake_fraction": 0.05,
+      "status": "void",
+      "paper_trade": true,
+      "created_at": "2026-04-11T01:51:17"
+    },
+    {
+      "rec_id": 81,
+      "match_id": 2287,
+      "home_team": 5,
+      "away_team": 11,
+      "match_date": "2026-04-11T03:15:00",
+      "side": "home",
+      "odds": 4.0,
+      "stake_fraction": 0.03509466666666664,
+      "status": "void",
+      "paper_trade": true,
+      "created_at": "2026-04-11T01:51:17"
+    },
+    {
+      "rec_id": 82,
+      "match_id": 2290,
+      "home_team": 7,
+      "away_team": 17,
+      "match_date": "2026-04-12T02:30:00",
+      "side": "home",
+      "odds": 1.09,
+      "stake_fraction": 0.0,
+      "status": "void",
+      "paper_trade": true,
+      "created_at": "2026-04-11T01:51:17"
+    },
+    {
+      "rec_id": 83,
+      "match_id": 2292,
+      "home_team": 13,
+      "away_team": 15,
+      "match_date": "2026-04-12T09:15:00",
+      "side": "home",
+      "odds": 2.3,
+      "stake_fraction": 0.05,
+      "status": "void",
+      "paper_trade": true,
+      "created_at": "2026-04-11T01:51:17"
+    },
+    {
+      "rec_id": 76,
+      "match_id": 2286,
+      "home_team": 12,
+      "away_team": 2,
+      "match_date": "2026-04-11T02:35:00",
+      "side": "home",
+      "odds": 6.5,
+      "stake_fraction": 0.05,
+      "status": "void",
+      "paper_trade": true,
+      "created_at": "2026-04-11T01:50:56"
+    },
+    {
+      "rec_id": 77,
+      "match_id": 2287,
+      "home_team": 5,
+      "away_team": 11,
+      "match_date": "2026-04-11T03:15:00",
+      "side": "home",
+      "odds": 4.0,
+      "stake_fraction": 0.03509466666666664,
+      "status": "void",
+      "paper_trade": true,
+      "created_at": "2026-04-11T01:50:56"
+    }
+  ],
+  "bankroll": {
+    "current_balance": null,
+    "peak_balance": null,
+    "drawdown": null,
+    "n_events": 0
+  },
+  "recent_outcomes": [
+    {
+      "recommendation_id": 41,
+      "won": false,
+      "profit_loss_units": -1.0,
+      "profit_loss_dollars": null,
+      "settled_at": "2026-04-11T01:53:08.605304"
+    }
+  ],
+  "no_bet_day": {
+    "is_no_bet_day": false,
+    "reason": null,
+    "today_rec_count": 10
+  }
+}

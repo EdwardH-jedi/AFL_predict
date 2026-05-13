@@ -25,19 +25,38 @@ from models.base_model import BaseModel
 FEATURE_COLS = [
     "bm_home_implied_prob",
     "bm_away_implied_prob",
-    "bm_overround",
     "home_elo_pre",
     "away_elo_pre",
     "elo_diff",
+    # Multi-window form
+    "home_win_rate_l3",
+    "away_win_rate_l3",
+    "home_win_rate_l5",
+    "away_win_rate_l5",
     "home_win_rate_l10",
     "away_win_rate_l10",
     "home_avg_pts_for_l10",
     "away_avg_pts_for_l10",
     "home_avg_pts_against_l10",
     "away_avg_pts_against_l10",
+    "home_momentum",
+    "away_momentum",
+    # H2H
+    "h2h_home_win_rate_l5",
+    "h2h_avg_margin_l5",
+    # Venue performance
+    "home_venue_win_rate",
+    "away_venue_win_rate",
+    "venue_home_advantage",
     "home_rest_days",
     "away_rest_days",
     "is_final",
+    # Interstate travel (4b) — away_interstate_travel and travel_km_diff kept
+    "away_interstate_travel",
+    "travel_km_diff",
+    # Weather (4c) — scoring index and rain signal kept; high_wind pruned
+    "weather_scoring_index",
+    "weather_is_raining",
 ]
 
 
@@ -84,14 +103,19 @@ class XGBoostModel(BaseModel):
         self._fit_features = available
 
         X_feat = _prep(X[available])
-        mask = X_feat.notna().all(axis=1) & y.notna()
+        # Only drop rows where the target is NaN. XGBoost natively handles NaN
+        # feature values by learning the optimal split direction for missing values.
+        # Previously used notna().all(axis=1) which silently dropped rows whenever
+        # any feature (e.g. bm_home_implied_prob) was NaN — leaving <5% of data
+        # in early folds where historical bookmaker odds are absent.
+        mask = y.notna()
         X_tr = X_feat[mask].values
         y_tr = y[mask].astype(int).values
 
         eval_set = None
         if X_val is not None and y_val is not None:
             av_val = [c for c in available if c in X_val.columns]
-            X_v = _prep(X_val[av_val]).fillna(0.5).values
+            X_v = _prep(X_val[av_val]).values  # keep NaN for XGBoost native handling
             y_v = y_val.reset_index(drop=True).astype(int).values
             eval_set = [(X_v, y_v)]
 
@@ -122,9 +146,9 @@ class XGBoostModel(BaseModel):
         if self._model is None:
             raise RuntimeError("XGBoostModel: not fitted. Call fit() first.")
         available = [c for c in self._fit_features if c in X.columns]
-        X_pred = _prep(X[available]).fillna(0.5).values
+        X_pred = _prep(X[available]).values  # XGBoost handles NaN natively
         probs = self._model.predict_proba(X_pred)
-        result = X[["match_id"]].copy().reset_index(drop=True)
+        result = X[["match_id"]].copy()
         result["home_win_prob"] = probs[:, 1].round(6)
         result["away_win_prob"] = probs[:, 0].round(6)
         return result
@@ -146,11 +170,16 @@ class XGBoostModel(BaseModel):
         self._fit_features = data["features"]
 
     def metadata(self) -> dict[str, Any]:
+        if hasattr(self, "_fit_features") and self._fit_features:
+            n_features = len(self._fit_features)
+        else:
+            n_features = None
         return {
             **super().metadata(),
             "n_estimators": self.n_estimators,
             "max_depth": self.max_depth,
             "learning_rate": self.learning_rate,
+            "n_features": n_features,
         }
 
 

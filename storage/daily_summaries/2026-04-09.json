@@ -1,0 +1,94 @@
+{
+  "date": "2026-04-09",
+  "generated_at": "2026-04-08T23:31:33.466581+00:00",
+  "pipeline": {
+    "status": "running",
+    "run_uuid": "19226f07-3980-4c1e-8a2b-f2d0bc620538",
+    "triggered_by": "cron",
+    "started_at": "2026-04-08T23:30:07.719878",
+    "completed_at": null,
+    "duration_seconds": null,
+    "jobs": [
+      {
+        "name": "check_data_freshness",
+        "status": "success",
+        "duration_seconds": 0.0,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "ingest_afl",
+        "status": "failed",
+        "duration_seconds": null,
+        "retry_count": 2,
+        "records_processed": null,
+        "error": "[Errno 11001] getaddrinfo failed"
+      },
+      {
+        "name": "ingest_tab_odds",
+        "status": "skipped",
+        "duration_seconds": null,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": "Skipped: upstream hard dependency failed."
+      },
+      {
+        "name": "build_features",
+        "status": "skipped",
+        "duration_seconds": null,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": "Skipped: upstream hard dependency failed."
+      },
+      {
+        "name": "generate_recommendations",
+        "status": "success",
+        "duration_seconds": 3.17,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "settle_results",
+        "status": "success",
+        "duration_seconds": 0.0,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      },
+      {
+        "name": "generate_daily_summary",
+        "status": "running",
+        "duration_seconds": null,
+        "retry_count": 0,
+        "records_processed": null,
+        "error": null
+      }
+    ]
+  },
+  "freshness": {
+    "odds_age_hours": 19.49,
+    "odds_stale": false,
+    "afl_age_hours": 30.9,
+    "afl_stale": false,
+    "upcoming_without_odds": 163,
+    "warnings": [
+      "163 upcoming match(es) have no odds snapshot."
+    ],
+    "checked_at": "2026-04-08T23:30:07.750391+00:00"
+  },
+  "recommendations": [],
+  "bankroll": {
+    "current_balance": null,
+    "peak_balance": null,
+    "drawdown": null,
+    "n_events": 0
+  },
+  "recent_outcomes": [],
+  "no_bet_day": {
+    "is_no_bet_day": true,
+    "reason": "No recommendations generated today (edge below threshold or no upcoming matches).",
+    "today_rec_count": 0
+  }
+}

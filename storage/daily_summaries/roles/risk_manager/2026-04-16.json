@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-04-16T02:25:34.863316+00:00",
+  "paper_trade_only": true,
+  "max_kelly_fraction": 0.05,
+  "min_edge_threshold": 0.03,
+  "today": {
+    "n": 4,
+    "sides": {
+      "home": 3,
+      "away": 1
+    },
+    "kelly_max": 0.05,
+    "kelly_mean": 0.041526,
+    "n_finals": 0,
+    "n_paper": 4,
+    "n_live": 0
+  },
+  "invariant_violations": [],
+  "drawdown": {
+    "n_settled": 7,
+    "cumulative_units": -0.12,
+    "peak_units": 1.8,
+    "current_drawdown_units": 1.92,
+    "max_drawdown_units": 2.0
+  },
+  "readiness": {
+    "available": false,
+    "reason": "evaluate_readiness not importable: cannot import name 'evaluate_readiness' from 'evaluation.live_readiness' (C:\\Users\\user\\OneDrive\\\ubc14\ud0d5 \ud654\uba74\\AFL_predict\\evaluation\\live_readiness.py)"
+  },
+  "verdict": "ok",
+  "warnings": []
+}

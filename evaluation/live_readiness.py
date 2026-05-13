@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from loguru import logger
@@ -42,7 +42,6 @@ from config.settings import get_settings
 from db.models.bankroll_logs import BankrollLog
 from db.models.bet_outcomes import BetOutcome
 from db.models.daily_pipeline_runs import DailyPipelineRun
-from db.models.match_features import MatchFeature
 from db.models.pipeline_runs import PipelineRun
 from db.models.predictions import Prediction
 from db.models.recommendations import Recommendation
@@ -57,12 +56,9 @@ settings = get_settings()
 CHECK_STATUS = {"pass", "warn", "fail"}
 
 # Known critical TODOs that must be resolved before live trial.
-# Add items here when a new blocker is identified.
-CRITICAL_TODOS: list[str] = [
-    "Select best model by Brier score (not just most-recent) in generate_recommendations._load_best_model",
-    "Load correct model class from artifact based on model_run.model_name",
-    "Confirm TAB bookmaker is available in your Odds API subscription tier",
-]
+# Add items here when a new blocker is identified; remove when resolved.
+# TAB bookmaker availability is checked at runtime via settings.tab_bookmaker_confirmed.
+CRITICAL_TODOS: list[str] = []
 
 
 @dataclass
@@ -111,7 +107,7 @@ def evaluate() -> ReadinessReport:
     Returns:
         ReadinessReport with per-check results and overall status.
     """
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     checks: list[ReadinessCheck] = []
 
     with db_session() as db:
@@ -236,7 +232,9 @@ def _check_calibration(db: Session) -> ReadinessCheck:
         return ReadinessCheck(
             name="calibration",
             status="warn",
-            detail=f"Only {len(recent_preds)} settled predictions for calibration check (need 30+).",
+            detail=(
+                f"Only {len(recent_preds)} settled predictions for calibration check (need 30+)."
+            ),
             value=len(recent_preds),
         )
 
@@ -278,7 +276,9 @@ def _check_calibration(db: Session) -> ReadinessCheck:
     return ReadinessCheck(
         name="calibration",
         status="fail",
-        detail=f"Brier score {brier:.4f} exceeds threshold {threshold}. Model may be miscalibrated.",
+        detail=(
+            f"Brier score {brier:.4f} exceeds threshold {threshold}. Model may be miscalibrated."
+        ),
         value=brier,
     )
 
@@ -405,9 +405,20 @@ def _check_roi(db: Session) -> ReadinessCheck:
 def _check_critical_todos() -> ReadinessCheck:
     """
     Report known unresolved critical TODOs that block live trial.
-    These are manually maintained in CRITICAL_TODOS above.
+
+    Static blockers are listed in CRITICAL_TODOS above.
+    Runtime-checkable items are evaluated here and appended dynamically.
     """
-    if not CRITICAL_TODOS:
+    todos = list(CRITICAL_TODOS)
+
+    # Runtime check: TAB bookmaker availability in Odds API subscription
+    if not settings.tab_bookmaker_confirmed:
+        todos.append(
+            "TAB bookmaker not yet confirmed in your Odds API subscription. "
+            "Verify TAB appears in odds responses, then set TAB_BOOKMAKER_CONFIRMED=true in .env."
+        )
+
+    if not todos:
         return ReadinessCheck(
             name="critical_todos",
             status="pass",
@@ -415,14 +426,14 @@ def _check_critical_todos() -> ReadinessCheck:
             value=0,
         )
     detail = (
-        f"{len(CRITICAL_TODOS)} critical TODO(s) unresolved:\n"
-        + "\n".join(f"  - {t}" for t in CRITICAL_TODOS)
+        f"{len(todos)} critical TODO(s) unresolved:\n"
+        + "\n".join(f"  - {t}" for t in todos)
     )
     return ReadinessCheck(
         name="critical_todos",
         status="fail",
         detail=detail,
-        value=len(CRITICAL_TODOS),
+        value=len(todos),
     )
 
 

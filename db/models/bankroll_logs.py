@@ -1,4 +1,4 @@
-"""db/models/bankroll_logs.py — Hypothetical bankroll ledger for paper trading."""
+"""db/models/bankroll_logs.py — Bankroll ledger for paper trading and live TAB bets."""
 
 from datetime import datetime
 
@@ -13,16 +13,22 @@ class BankrollLog(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
+    # 'paper'  — simulated bankroll (starts at $1000, no real money)
+    # 'live'   — actual AUD bankroll from TAB bets
+    log_type: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="paper", server_default="paper"
+    )
+
     # Event type: 'deposit' | 'withdrawal' | 'bet_placed' | 'bet_settled'
     event_type: Mapped[str] = mapped_column(String(30), nullable=False)
 
-    # Running balance after this event
+    # Running balance after this event (AUD for live, virtual units for paper)
     balance_after: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Change amount (positive = credit, negative = debit)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
 
-    # Optional reference to a recommendation
+    # Optional reference (recommendation_id for paper, bet_outcome_id for live)
     recommendation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -30,6 +36,6 @@ class BankrollLog(Base):
 
     def __repr__(self) -> str:
         return (
-            f"<BankrollLog id={self.id} event={self.event_type!r} "
-            f"amount={self.amount} balance_after={self.balance_after}>"
+            f"<BankrollLog id={self.id} type={self.log_type!r} "
+            f"event={self.event_type!r} amount={self.amount} balance_after={self.balance_after}>"
         )

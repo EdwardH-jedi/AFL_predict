@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_secret_key: str = "changeme-use-a-long-random-string"
 
+    # --- Frontend ---
+    # Origin of the React dashboard. Added to the CORS allow-list in addition
+    # to the Vite dev defaults (http://localhost:5173, http://127.0.0.1:5173).
+    # Example prod: "http://rx6600.local:5173" or the RX 6600 static host.
+    frontend_url: str = Field(
+        default="",
+        description="Primary frontend origin for CORS. Empty = dev-only (Vite defaults used).",
+    )
+
     # --- AFL Data Source: Squiggle API (squiggle.com.au) ---
     # Public, free, no API key. Must set a descriptive User-Agent per their usage policy.
     squiggle_base_url: str = "https://api.squiggle.com.au"
@@ -120,18 +129,51 @@ class Settings(BaseSettings):
     ensemble_weight_xgboost: float = Field(default=0.35)
     ensemble_weight_poisson: float = Field(default=0.25)
 
+    # --- Dual-Machine Architecture ---
+    # NODE_ROLE controls which pipeline jobs run on this machine:
+    #   'standalone'  — runs all jobs (single-machine default)
+    #   'collector'   — RX 6600: ingestion only (ingest_afl, ingest_tab_odds + freshness)
+    #   'predictor'   — RTX 5080: modelling only (build_features, recommendations, settle)
+    node_role: Literal["standalone", "collector", "predictor"] = Field(
+        default="standalone",
+        description="Role of this machine in the dual-machine deployment.",
+    )
+    predictor_api_url: str = Field(
+        default="",
+        description="Base URL of the collector's API, e.g. http://rx6600:8000 (predictor only).",
+    )
+
     # --- Live Bankroll ---
     live_initial_bankroll: float = Field(default=1000.0)
 
-    # --- Telegram Notifications ---
-    # Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env to enable alerts.
-    # Get a bot token from @BotFather on Telegram.
-    # Get your chat ID by messaging @userinfobot.
-    telegram_bot_token: str = Field(default="", description="Telegram Bot API token")
-    telegram_chat_id: str = Field(default="", description="Target chat/channel ID for alerts")
-    telegram_enabled: bool = Field(
+    # --- TAB Bookmaker Confirmation ---
+    # Set to true in .env once you have confirmed that TAB is available in your
+    # Odds API subscription tier (check https://the-odds-api.com/liveapi/guides/v4/#parameters
+    # for the list of bookmakers returned by your key).
+    tab_bookmaker_confirmed: bool = Field(
         default=False,
-        description="Master switch for Telegram notifications. Set to true in .env once configured.",
+        description="Set true once you have verified TAB appears in your Odds API responses.",
+    )
+
+    # --- Discord Notifications ---
+    # Set DISCORD_WEBHOOK_URL in .env to enable alerts.
+    # Create a webhook: Discord 채널 설정 → 연동 → 웹후크 → 새 웹후크 → URL 복사
+    discord_webhook_url: str = Field(default="", description="Discord webhook URL for alerts")
+    discord_enabled: bool = Field(
+        default=False,
+        description="Master switch for Discord notifications. Set to true in .env once configured.",
+    )
+    # --- Discord Bot (read-back) ---
+    # Required for reading message history from the channel.
+    # Create a bot at https://discord.com/developers/applications, enable
+    # MESSAGE CONTENT INTENT, add to server with Read Message History permission.
+    discord_bot_token: str = Field(
+        default="",
+        description="Discord bot token for reading message history",
+    )
+    discord_channel_id: str = Field(
+        default="",
+        description="Discord channel ID to read bet notifications from",
     )
 
     @property

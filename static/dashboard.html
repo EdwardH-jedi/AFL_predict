@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AFL Predict — Paper Trade Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f1117;
+      --surface: #1a1d27;
+      --surface2:#21253a;
+      --border:  #2a2d3a;
+      --accent:  #4f8ef7;
+      --green:   #22c55e;
+      --red:     #ef4444;
+      --yellow:  #f59e0b;
+      --purple:  #a855f7;
+      --text:    #e2e8f0;
+      --muted:   #6b7280;
+      --radius:  10px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 24px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    header h1 span { color: var(--accent); }
+    #last-updated { color: var(--muted); font-size: 12px; }
+
+    /* ---- tabs ---- */
+    .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .tab-btn {
+      padding: 8px 18px; border: none; background: none; color: var(--muted);
+      font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -1px; transition: color .15s, border-color .15s;
+    }
+    .tab-btn:hover  { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ---- stat cards ---- */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px; margin-bottom: 24px;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 18px;
+    }
+    .card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 5px; }
+    .card .value { font-size: 24px; font-weight: 700; }
+    .card .sub   { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .green { color: var(--green); }
+    .red   { color: var(--red);   }
+    .blue  { color: var(--accent); }
+    .amber { color: var(--yellow); }
+    .purple{ color: var(--purple); }
+
+    /* ---- chart boxes ---- */
+    .charts-row {
+      display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 24px;
+    }
+    @media (max-width: 860px) { .charts-row { grid-template-columns: 1fr; } }
+    .chart-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px;
+    }
+    .chart-box h3 {
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;
+    }
+    .chart-box canvas { max-height: 210px; }
+
+    /* ---- model chart ---- */
+    .section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px; margin-bottom: 24px;
+    }
+    .section h3 {
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;
+    }
+    .section canvas { max-height: 180px; }
+
+    /* ---- filter bar ---- */
+    .filter-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .filter-bar select, .filter-bar input {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 13px; outline: none;
+    }
+
+    /* ---- tables ---- */
+    .table-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden; margin-bottom: 24px;
+    }
+    .table-box-header {
+      padding: 14px 18px 10px; border-bottom: 1px solid var(--border);
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      color: var(--muted); font-weight: 500; text-align: left;
+      padding: 9px 14px; font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.4px; border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    td { padding: 9px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(79,142,247,.05); }
+
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 99px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .badge-pending { background: rgba(245,158,11,.15); color: var(--yellow); }
+    .badge-settled { background: rgba(34,197,94,.15);  color: var(--green);  }
+    .badge-void    { background: rgba(107,114,128,.15);color: var(--muted);  }
+    .badge-home    { background: rgba(79,142,247,.15); color: var(--accent); }
+    .badge-away    { background: rgba(168,85,247,.15); color: var(--purple); }
+    .badge-win     { background: rgba(34,197,94,.15);  color: var(--green);  }
+    .badge-loss    { background: rgba(239,68,68,.15);  color: var(--red);    }
+    .badge-paper   { background: rgba(79,142,247,.10); color: var(--accent); }
+    .badge-live    { background: rgba(239,68,68,.15);  color: var(--red);    }
+
+    .progress-bar-bg { background: var(--border); border-radius: 4px; height: 5px; margin-top: 8px; }
+    .progress-bar    { border-radius: 4px; height: 5px; transition: width .4s; }
+    .progress-bar.green  { background: var(--green); }
+    .progress-bar.amber  { background: var(--yellow); }
+    .progress-bar.red    { background: var(--red); }
+    .progress-bar.blue   { background: var(--accent); }
+
+    /* ---- Discord history ---- */
+    .discord-status {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 18px; margin-bottom: 20px;
+      font-size: 13px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-green  { background: var(--green); }
+    .dot-red    { background: var(--red); }
+    .dot-yellow { background: var(--yellow); }
+
+    .msg-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 14px; overflow: hidden;
+    }
+    .msg-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 18px; border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .msg-header .date  { font-weight: 600; font-size: 14px; }
+    .msg-header .meta  { color: var(--muted); font-size: 12px; }
+    .msg-body { padding: 4px 0; }
+    .pick-row {
+      display: grid;
+      grid-template-columns: 2fr 80px 80px 90px 90px 80px;
+      gap: 0; padding: 10px 18px; border-bottom: 1px solid var(--border);
+      align-items: center;
+    }
+    .pick-row:last-child { border-bottom: none; }
+    .pick-row .team { font-weight: 500; }
+    .pick-row .stat { color: var(--muted); font-size: 12px; }
+    .pick-row .stat span { color: var(--text); font-weight: 500; }
+
+    .setup-guide {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px; max-width: 560px;
+    }
+    .setup-guide h3 { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+    .setup-guide ol { padding-left: 20px; }
+    .setup-guide li { margin-bottom: 10px; line-height: 1.6; }
+    .setup-guide code {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 12px;
+    }
+    .setup-guide a { color: var(--accent); }
+
+    .loading { text-align: center; padding: 60px; color: var(--muted); }
+    .empty   { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+    .err     { text-align: center; padding: 40px; color: var(--red); }
+
+    /* ---- role cards ---- */
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .role-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px;
+    }
+    .role-card h4 {
+      font-size: 13px; font-weight: 600; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .role-card .sub { color: var(--muted); font-size: 11px; margin-bottom: 10px; }
+    .role-card ul { list-style: none; font-size: 12px; }
+    .role-card li { padding: 6px 0; border-top: 1px solid var(--border); color: var(--text); }
+    .role-card li:first-child { border-top: 0; }
+    .verdict-pill {
+      font-size: 10px; letter-spacing: 0.5px; font-weight: 700; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 999px; border: 1px solid transparent;
+    }
+    .vp-ok       { background: rgba(34,197,94,.15);  color: var(--green);  border-color: rgba(34,197,94,.3); }
+    .vp-warn     { background: rgba(245,158,11,.15); color: var(--yellow); border-color: rgba(245,158,11,.3); }
+    .vp-critical { background: rgba(239,68,68,.15);  color: var(--red);    border-color: rgba(239,68,68,.3); }
+    .vp-no_data, .vp-missing { background: rgba(107,114,128,.15); color: var(--muted); border-color: rgba(107,114,128,.3); }
+
+    /* ---- coverage bar ---- */
+    .bar-row { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 3px 0; }
+    .bar-row .lbl { flex: 0 0 140px; color: var(--muted); }
+    .bar { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    .bar > span { display: block; height: 100%; background: var(--accent); }
+    .bar-row .val { flex: 0 0 56px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ---- calibration tab ---- */
+    .cal-header {
+      display: flex; gap: 14px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .cal-header select {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 13px;
+    }
+    .cal-metric { font-size: 12px; color: var(--muted); }
+    .cal-metric strong { color: var(--text); font-weight: 600; margin-left: 4px; }
+
+    /* ---- discord comparison block ---- */
+    .dc-compare {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 18px; margin-bottom: 20px;
+    }
+    .dc-compare h3 {
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;
+    }
+    .dc-compare-cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+    }
+    .dc-stat { padding: 8px 12px; background: var(--surface2); border-radius: 6px; }
+    .dc-stat .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .dc-stat .val { font-size: 17px; font-weight: 700; margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>AFL Predict <span>Paper Trade</span> Dashboard</h1>
+  <span id="last-updated">Loading…</span>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('performance',  this)">Performance</button>
+  <button class="tab-btn"        onclick="switchTab('bets',         this)">Bet History</button>
+  <button class="tab-btn"        onclick="switchTab('models',       this)">Models</button>
+  <button class="tab-btn"        onclick="switchTab('calibration',  this)">Calibration</button>
+  <button class="tab-btn"        onclick="switchTab('roles',        this)">Roles</button>
+  <button class="tab-btn"        onclick="switchTab('discord',      this)">Discord</button>
+</div>
+
+<!-- ===== TAB: PERFORMANCE ===== -->
+<div id="tab-performance" class="tab-panel active">
+  <div id="cards-container"><div class="loading">Loading…</div></div>
+  <div class="charts-row">
+    <div class="chart-box"><h3>Cumulative P&amp;L (units)</h3><canvas id="chart-pl"></canvas><p id="chart-pl-empty" class="empty" style="display:none">No settled bets yet — chart will populate as results come in.</p></div>
+    <div class="chart-box"><h3>Win / Loss Split</h3><canvas id="chart-donut"></canvas><p id="chart-donut-empty" class="empty" style="display:none">No settled bets yet.</p></div>
+  </div>
+</div>
+
+<!-- ===== TAB: BET HISTORY ===== -->
+<div id="tab-bets" class="tab-panel">
+  <div class="filter-bar">
+    <select id="filter-status">
+      <option value="all">All statuses</option>
+      <option value="settled">Settled</option>
+      <option value="pending">Pending</option>
+      <option value="void">Void</option>
+    </select>
+    <select id="filter-side">
+      <option value="all">Both sides</option>
+      <option value="home">Home bets</option>
+      <option value="away">Away bets</option>
+    </select>
+    <input id="filter-search" type="text" placeholder="Search team…" style="width:180px" />
+    <span id="bet-count" style="color:var(--muted);font-size:12px;margin-left:4px"></span>
+  </div>
+  <div class="table-box">
+    <div class="table-wrap">
+      <table id="bets-table">
+        <thead><tr>
+          <th>#</th><th>Date</th><th>Match</th><th>Round</th>
+          <th>Side</th><th>Odds</th><th>Model %</th><th>Edge</th>
+          <th>Kelly</th><th>Status</th><th>Result</th><th>P&amp;L</th><th>CLV</th>
+        </tr></thead>
+        <tbody id="bets-body"><tr><td colspan="13" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB: MODELS ===== -->
+<div id="tab-models" class="tab-panel">
+  <div class="section">
+    <h3>Brier Score — lower is better (0 = perfect, 0.25 = baseline)</h3>
+    <canvas id="chart-brier"></canvas>
+  </div>
+  <div class="section">
+    <h3>Accuracy % — % of correct winner picks on validation set</h3>
+    <canvas id="chart-accuracy"></canvas>
+  </div>
+  <div class="table-box" style="margin-top:0">
+    <div class="table-box-header">Latest Model Runs</div>
+    <div class="table-wrap">
+      <table id="model-table">
+        <thead><tr>
+          <th>Model</th><th>Brier</th><th>Accuracy</th><th>Log Loss</th><th>Trained At</th>
+        </tr></thead>
+        <tbody id="model-body"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB: CALIBRATION ===== -->
+<div id="tab-calibration" class="tab-panel">
+  <div class="cal-header">
+    <label style="color:var(--muted);font-size:12px">Model</label>
+    <select id="cal-model" onchange="loadCalibration()"></select>
+    <span id="cal-ece"  class="cal-metric">ECE <strong>—</strong></span>
+    <span id="cal-n"    class="cal-metric">n settled <strong>—</strong></span>
+    <span id="cal-name" class="cal-metric"></span>
+  </div>
+  <div class="charts-row">
+    <div class="chart-box">
+      <h3>Reliability Diagram — predicted vs observed</h3>
+      <canvas id="chart-reliability"></canvas>
+      <p class="empty" id="cal-empty" style="display:none">No settled predictions for this model yet.</p>
+    </div>
+    <div class="chart-box">
+      <h3>Per-Phase Brier</h3>
+      <canvas id="chart-phase-brier"></canvas>
+    </div>
+  </div>
+  <div class="section" style="font-size:12px;color:var(--muted)">
+    A well-calibrated model hugs the diagonal. Systematic drift away from it (high ECE) means
+    the probabilities are biased — don't stake on them until the model is recalibrated.
+  </div>
+</div>
+
+<!-- ===== TAB: ROLES ===== -->
+<div id="tab-roles" class="tab-panel">
+  <div id="roles-root"><div class="loading">Loading role audits…</div></div>
+</div>
+
+<!-- ===== TAB: DISCORD ===== -->
+<div id="tab-discord" class="tab-panel">
+  <div id="discord-compare-root"></div>
+  <div id="discord-root"><div class="loading">Loading Discord status…</div></div>
+</div>
+
+<script>
+const API = window.location.origin;
+
+// ---- Tab switching ----
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+
+  if (name === 'discord'     && !_discordLoaded)     loadDiscord();
+  if (name === 'roles'       && !_rolesLoaded)       loadRoles();
+  if (name === 'calibration' && !_calibrationLoaded) loadCalibrationInit();
+}
+
+// ---- Main data load ----
+let _charts = {};
+let _allBets = [];
+let _discordLoaded = false;
+let _rolesLoaded = false;
+let _calibrationLoaded = false;
+
+async function loadMain() {
+  try {
+    const [perf, clv] = await Promise.all([
+      fetch(`${API}/dashboard/performance`).then(r => r.json()),
+      fetch(`${API}/dashboard/clv`).then(r => r.json()).catch(() => ({ clv: {} })),
+    ]);
+    renderPerformance(perf, clv.clv || {});
+    renderBetTable(perf.bets);
+    renderModels(perf.model_runs);
+    document.getElementById('last-updated').textContent =
+      'Updated: ' + new Date().toLocaleTimeString();
+  } catch (err) {
+    document.getElementById('cards-container').innerHTML =
+      `<div class="err">Failed to load: ${err.message}<br>Make sure the API server is running.</div>`;
+  }
+}
+
+// ===========================================================================
+// PERFORMANCE TAB
+// ===========================================================================
+
+function renderPerformance(data, clv) {
+  const { summary, cumulative_pl } = data;
+  renderCards(summary, clv);
+  drawPLChart(cumulative_pl);
+  drawDonut(summary);
+}
+
+function renderCards(s, clv) {
+  const winColor = s.win_rate_pct !== null
+    ? (s.win_rate_pct >= 55 ? 'green' : s.win_rate_pct >= 45 ? 'amber' : 'red') : 'blue';
+  const roiColor = s.roi_pct !== null
+    ? (s.roi_pct > 0 ? 'green' : 'red') : 'blue';
+  const clvVal   = clv.mean_clv_pct != null ? `${(clv.mean_clv_pct*100).toFixed(2)}%` : '—';
+  const clvBcl   = clv.beat_closing_line_pct != null ? `${(clv.beat_closing_line_pct*100).toFixed(1)}%` : '—';
+  const clvColor = (clv.mean_clv_pct || 0) >= 0 ? 'green' : 'red';
+
+  document.getElementById('cards-container').innerHTML = `
+    <div class="cards">
+      <div class="card">
+        <div class="label">Active Bets</div>
+        <div class="value blue">${s.settled + s.pending}</div>
+        <div class="sub">${s.settled} settled · ${s.pending} pending</div>
+      </div>
+      <div class="card">
+        <div class="label">Win Rate</div>
+        <div class="value ${winColor}">${s.win_rate_pct !== null ? s.win_rate_pct + '%' : '—'}</div>
+        <div class="sub">${s.wins}W / ${s.losses}L settled</div>
+        ${s.settled > 0 ? `<div class="progress-bar-bg"><div class="progress-bar ${winColor}" style="width:${s.win_rate_pct}%"></div></div>` : ''}
+      </div>
+      <div class="card">
+        <div class="label">ROI</div>
+        <div class="value ${roiColor}">${s.roi_pct !== null ? s.roi_pct + '%' : '—'}</div>
+        <div class="sub">P&L: ${s.total_pl_units >= 0 ? '+' : ''}${s.total_pl_units} units</div>
+      </div>
+      <div class="card">
+        <div class="label">Avg CLV</div>
+        <div class="value ${clvColor}">${clvVal}</div>
+        <div class="sub">Beat market: ${clvBcl}</div>
+      </div>
+      <div class="card">
+        <div class="label">Open Bets</div>
+        <div class="value amber">${s.pending}</div>
+        <div class="sub">Awaiting results</div>
+      </div>
+    </div>`;
+}
+
+function drawPLChart(series) {
+  const emptyEl = document.getElementById('chart-pl-empty');
+  const canvas  = document.getElementById('chart-pl');
+  if (!series.length) {
+    canvas.style.display = 'none';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  if (_charts.pl) _charts.pl.destroy();
+  const colors = series.map(p => p.won ? 'rgba(34,197,94,0.9)' : 'rgba(239,68,68,0.9)');
+  _charts.pl = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: series.map(p => p.date.slice(0,10)),
+      datasets: [{
+        label: 'Cumulative P&L (units)',
+        data: series.map(p => p.cumulative_pl),
+        borderColor: '#4f8ef7',
+        backgroundColor: 'rgba(79,142,247,0.07)',
+        borderWidth: 2,
+        pointBackgroundColor: colors,
+        pointRadius: 5,
+        fill: true, tension: 0.3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw >= 0 ? '+' : ''}${ctx.raw}u` } }
+      },
+      scales: {
+        x: { ticks: { color: '#6b7280', maxTicksLimit: 8 }, grid: { color: '#2a2d3a' } },
+        y: { ticks: { color: '#6b7280' }, grid: { color: '#2a2d3a' } },
+      }
+    }
+  });
+}
+
+function drawDonut(s) {
+  const emptyEl = document.getElementById('chart-donut-empty');
+  const canvas  = document.getElementById('chart-donut');
+  if (!s.settled) {
+    canvas.style.display = 'none';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  if (_charts.donut) _charts.donut.destroy();
+  _charts.donut = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: ['Wins', 'Losses', 'Pending'],
+      datasets: [{
+        data: [s.wins, s.losses, s.pending],
+        backgroundColor: ['#22c55e', '#ef4444', '#f59e0b'],
+        borderColor: '#1a1d27', borderWidth: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#e2e8f0', boxWidth: 12, padding: 14 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}` } }
+      }
+    }
+  });
+}
+
+// ===========================================================================
+// BET HISTORY TAB
+// ===========================================================================
+
+function renderBetTable(bets) {
+  _allBets = bets;
+  applyFilters();
+
+  document.getElementById('filter-status').onchange = applyFilters;
+  document.getElementById('filter-side').onchange   = applyFilters;
+  document.getElementById('filter-search').oninput  = applyFilters;
+}
+
+function applyFilters() {
+  const status = document.getElementById('filter-status').value;
+  const side   = document.getElementById('filter-side').value;
+  const search = document.getElementById('filter-search').value.toLowerCase().trim();
+
+  let filtered = _allBets;
+  if (status !== 'all') filtered = filtered.filter(b => b.status === status);
+  if (side   !== 'all') filtered = filtered.filter(b => b.side === side);
+  if (search) filtered = filtered.filter(b =>
+    b.home_team.toLowerCase().includes(search) ||
+    b.away_team.toLowerCase().includes(search)
+  );
+
+  document.getElementById('bet-count').textContent = `${filtered.length} bets`;
+  const tbody = document.getElementById('bets-body');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="13" class="empty">No bets match the filter.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.slice().reverse().map((b, i) => {
+    const mp = b.side === 'home' ? b.home_win_prob : b.away_win_prob;
+    const modelPct = mp != null ? (mp*100).toFixed(1)+'%' : '—';
+    const edgeNum  = b.edge;
+    const edge = edgeNum != null && !isNaN(edgeNum)
+      ? `<span class="${edgeNum >= 0 ? 'green' : 'red'}">${edgeNum >= 0 ? '+' : ''}${(edgeNum*100).toFixed(1)}%</span>`
+      : '<span style="color:var(--muted)">—</span>';
+    const kelly = b.stake_fraction ? (b.stake_fraction*100).toFixed(2)+'%' : '—';
+    const dateStr = (b.match_time || b.created_at).slice(0, 10);
+
+    let result = '—', pl = '—', clvCell = '—';
+    if (b.outcome) {
+      result   = `<span class="badge badge-${b.outcome.won ? 'win' : 'loss'}">${b.outcome.won ? 'Win' : 'Loss'}</span>`;
+      pl       = b.outcome.pl_units != null
+        ? `<span class="${b.outcome.pl_units >= 0 ? 'green' : 'red'}">${b.outcome.pl_units >= 0 ? '+' : ''}${b.outcome.pl_units}</span>` : '—';
+      clvCell  = b.outcome.clv != null
+        ? `<span class="${b.outcome.clv >= 0 ? 'green' : 'red'}">${b.outcome.clv >= 0 ? '+' : ''}${(b.outcome.clv*100).toFixed(2)}%</span>` : '—';
+    }
+
+    return `<tr>
+      <td style="color:var(--muted)">${filtered.length - i}</td>
+      <td>${dateStr}</td>
+      <td>${b.home_team} vs ${b.away_team}</td>
+      <td style="color:var(--muted)">${b.round || '—'}</td>
+      <td><span class="badge badge-${b.side}">${b.side}</span></td>
+      <td>${b.odds}</td>
+      <td>${modelPct}</td>
+      <td>${edge}</td>
+      <td style="color:var(--muted)">${kelly}</td>
+      <td><span class="badge badge-${b.status}">${b.status}</span></td>
+      <td>${result}</td>
+      <td>${pl}</td>
+      <td>${clvCell}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ===========================================================================
+// MODELS TAB
+// ===========================================================================
+
+function renderModels(runs) {
+  if (_charts.brier) _charts.brier.destroy();
+  if (_charts.acc)   _charts.acc.destroy();
+
+  const labels   = runs.map(r => modelLabel(r.model));
+  const briers   = runs.map(r => r.brier ?? null);
+  const accPct   = runs.map(r => r.accuracy != null ? +(r.accuracy*100).toFixed(1) : null);
+  const barColors = runs.map((_, i) => [
+    '#4f8ef7','#22c55e','#f59e0b','#ef4444','#a855f7'
+  ][i % 5]);
+
+  _charts.brier = new Chart(document.getElementById('chart-brier'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Brier Score', data: briers,
+        backgroundColor: barColors, borderRadius: 5,
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw}` } } },
+      scales: {
+        x: { ticks: { color: '#6b7280' }, grid: { color: '#2a2d3a' }, min: 0, max: 0.30 },
+        y: { ticks: { color: '#e2e8f0' }, grid: { color: '#2a2d3a' } },
+      }
+    }
+  });
+
+  _charts.acc = new Chart(document.getElementById('chart-accuracy'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Accuracy %', data: accPct,
+        backgroundColor: barColors, borderRadius: 5,
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw}%` } } },
+      scales: {
+        x: { ticks: { color: '#6b7280', callback: v => v+'%' }, grid: { color: '#2a2d3a' }, min: 40, max: 80 },
+        y: { ticks: { color: '#e2e8f0' }, grid: { color: '#2a2d3a' } },
+      }
+    }
+  });
+
+  // Table
+  document.getElementById('model-body').innerHTML = runs.map(r => `
+    <tr>
+      <td style="font-weight:500">${modelLabel(r.model)}</td>
+      <td><span class="${r.brier < 0.22 ? 'green' : r.brier < 0.24 ? 'amber' : 'red'}">${r.brier ?? '—'}</span></td>
+      <td>${r.accuracy != null ? (r.accuracy*100).toFixed(1)+'%' : '—'}</td>
+      <td style="color:var(--muted)">${r.log_loss ?? '—'}</td>
+      <td style="color:var(--muted)">${r.trained_at ? r.trained_at.slice(0,16).replace('T',' ') : '—'}</td>
+    </tr>`).join('');
+}
+
+function modelLabel(name) {
+  return { bookmaker_baseline:'Bookmaker', elo_baseline:'ELO',
+           logistic_baseline:'Logistic', xgboost:'XGBoost', poisson:'Poisson' }[name] || name;
+}
+
+// ===========================================================================
+// DISCORD HISTORY TAB
+// ===========================================================================
+
+async function loadDiscord() {
+  _discordLoaded = true;
+  const root = document.getElementById('discord-root');
+  root.innerHTML = '<div class="loading">Checking Discord status…</div>';
+
+  try {
+    const status = await fetch(`${API}/discord/status`).then(r => r.json());
+
+    if (!status.configured) {
+      root.innerHTML = renderSetupGuide();
+      return;
+    }
+
+    if (!status.reachable) {
+      root.innerHTML = `
+        <div class="discord-status">
+          <div class="dot dot-red"></div>
+          <div>Bot configured but channel unreachable — ${status.error || 'check token and channel ID'}.</div>
+        </div>
+        ${renderSetupGuide()}`;
+      return;
+    }
+
+    // Bot is live — fetch message history
+    root.innerHTML = `
+      <div class="discord-status">
+        <div class="dot dot-green"></div>
+        <div>Discord bot connected. Loading message history…</div>
+      </div>`;
+
+    const data = await fetch(`${API}/discord/history?limit=300`).then(r => r.json());
+    renderDiscordHistory(root, status, data);
+
+  } catch (err) {
+    root.innerHTML = `<div class="err">Failed to load Discord data: ${err.message}</div>`;
+  }
+}
+
+function renderDiscordHistory(root, status, data) {
+  const { history, afl_notifications, total_picks, date_range, messages_fetched } = data;
+
+  const statsBar = `
+    <div class="discord-status" style="margin-bottom:20px">
+      <div class="dot dot-green"></div>
+      <div>
+        <strong>${afl_notifications}</strong> AFL notifications found in
+        <strong>${messages_fetched}</strong> messages fetched &nbsp;·&nbsp;
+        <strong>${total_picks}</strong> total picks &nbsp;·&nbsp;
+        Range: ${date_range.first || '—'} → ${date_range.last || '—'}
+      </div>
+    </div>`;
+
+  if (!history.length) {
+    root.innerHTML = statsBar +
+      '<div class="empty">No AFL bet notification messages found in this channel.</div>';
+    return;
+  }
+
+  // Filter bar
+  const filterBar = `
+    <div class="filter-bar" style="margin-bottom:16px">
+      <input id="dc-search" type="text" placeholder="Search team or date…" style="width:220px" oninput="filterDiscord()" />
+      <select id="dc-mode" onchange="filterDiscord()">
+        <option value="all">All modes</option>
+        <option value="PAPER TRADE">Paper trade</option>
+        <option value="LIVE">Live</option>
+      </select>
+      <span id="dc-count" style="color:var(--muted);font-size:12px"></span>
+    </div>`;
+
+  root.innerHTML = statsBar + filterBar + '<div id="dc-cards"></div>';
+
+  // Store globally for filter
+  window._dcHistory = history.slice().reverse();  // newest first
+  renderDiscordCards(window._dcHistory);
+}
+
+function filterDiscord() {
+  const search = document.getElementById('dc-search').value.toLowerCase().trim();
+  const mode   = document.getElementById('dc-mode').value;
+
+  let filtered = window._dcHistory || [];
+  if (mode !== 'all') filtered = filtered.filter(m => m.mode === mode);
+  if (search) filtered = filtered.filter(m =>
+    m.date_label.toLowerCase().includes(search) ||
+    m.bets.some(b =>
+      b.pick_team.toLowerCase().includes(search) ||
+      b.opp_team.toLowerCase().includes(search)
+    )
+  );
+  renderDiscordCards(filtered);
+}
+
+function renderDiscordCards(messages) {
+  const el = document.getElementById('dc-cards');
+  const countEl = document.getElementById('dc-count');
+  if (countEl) countEl.textContent = `${messages.length} notification${messages.length !== 1 ? 's' : ''}`;
+
+  if (!messages.length) {
+    el.innerHTML = '<div class="empty">No messages match the filter.</div>';
+    return;
+  }
+
+  el.innerHTML = messages.map(msg => {
+    const sentAt = msg.sent_at ? msg.sent_at.slice(0,16).replace('T',' ') + ' UTC' : '';
+    const modeBadge = msg.mode === 'LIVE'
+      ? '<span class="badge badge-live">Live</span>'
+      : '<span class="badge badge-paper">Paper</span>';
+
+    const picks = msg.bets.map(b => {
+      const sideBadge = `<span class="badge badge-${b.side}">${b.side}</span>`;
+      const edge = b.edge != null
+        ? `<span class="${b.edge >= 0 ? 'green' : 'red'}">${b.edge >= 0 ? '+' : ''}${(b.edge*100).toFixed(1)}%</span>`
+        : '—';
+      const model = b.model_prob != null ? (b.model_prob*100).toFixed(0)+'%' : '—';
+      const odds  = b.odds != null ? `@${b.odds}` : '—';
+
+      return `<div class="pick-row">
+        <div class="team">
+          ${b.pick_team} ${sideBadge}
+          <span style="color:var(--muted);font-weight:400"> vs ${b.opp_team}</span>
+        </div>
+        <div class="stat"><span>${odds}</span></div>
+        <div class="stat">Model <span>${model}</span></div>
+        <div class="stat">Edge ${edge}</div>
+        <div class="stat">Stake <span>${b.stake_pct != null ? (b.stake_pct*100).toFixed(1)+'%' : '—'}</span></div>
+        <div class="stat">${b.round || ''}</div>
+      </div>`;
+    }).join('');
+
+    return `<div class="msg-card">
+      <div class="msg-header">
+        <div class="date">${msg.date_label} ${modeBadge}</div>
+        <div class="meta">${sentAt} · ${msg.bets.length} pick${msg.bets.length !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="msg-body">${picks || '<div class="empty" style="padding:12px 18px">No picks parsed.</div>'}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderSetupGuide() {
+  return `<div class="setup-guide">
+    <h3>Set up Discord Bot to enable read-back</h3>
+    <ol>
+      <li>Go to <a href="https://discord.com/developers/applications" target="_blank">discord.com/developers/applications</a> → <strong>New Application</strong></li>
+      <li>Open the <strong>Bot</strong> tab → <strong>Add Bot</strong> → copy the token</li>
+      <li>On the same tab, enable <strong>Message Content Intent</strong></li>
+      <li>Go to <strong>OAuth2 → URL Generator</strong>: select scope <code>bot</code>, permission <code>Read Message History</code> → invite the bot to your server</li>
+      <li>In Discord: enable <strong>Developer Mode</strong> (Settings → Advanced), then right-click your bet channel → <strong>Copy Channel ID</strong></li>
+      <li>Add to your <code>.env</code>:<br>
+        <code>DISCORD_BOT_TOKEN=your_token_here</code><br>
+        <code>DISCORD_CHANNEL_ID=your_channel_id_here</code>
+      </li>
+      <li>Restart the API server → refresh this page</li>
+    </ol>
+  </div>`;
+}
+
+// ===========================================================================
+// ROLES TAB
+// ===========================================================================
+
+async function loadRoles() {
+  _rolesLoaded = true;
+  const root = document.getElementById('roles-root');
+  try {
+    const data = await fetch(`${API}/dashboard/roles`).then(r => r.json());
+    renderRoles(root, data);
+  } catch (err) {
+    root.innerHTML = `<div class="err">Failed to load roles: ${err.message}</div>`;
+  }
+}
+
+function renderRoles(root, data) {
+  const order = ['data_steward', 'feature_engineer', 'model_engineer', 'risk_manager', 'quant_reviewer'];
+  const titles = {
+    data_steward:     'Data Steward',
+    feature_engineer: 'Feature Engineer',
+    model_engineer:   'Model Engineer',
+    risk_manager:     'Risk Manager',
+    quant_reviewer:   'Quant Reviewer',
+  };
+
+  const cards = order.map(role => {
+    const r = data.roles[role] || { available: false };
+    if (!r.available) {
+      return `<div class="role-card"><h4>${titles[role]} <span class="verdict-pill vp-missing">no data</span></h4>
+        <div class="sub">No artifact found for ${data.day}.</div></div>`;
+    }
+    const verdict = r.verdict || 'no_data';
+    const warnings = (r.warnings || []).map(w => `<li>⚠ ${escapeHtml(w)}</li>`).join('');
+    const body = renderRoleBody(role, r);
+    return `<div class="role-card">
+      <h4>${titles[role]} <span class="verdict-pill vp-${verdict}">${verdict}</span></h4>
+      <div class="sub">Generated ${(r.generated_at || '').slice(0,19).replace('T',' ')} UTC · ${r.source_file || ''}</div>
+      ${body}
+      ${warnings ? `<ul style="margin-top:10px">${warnings}</ul>` : '<div class="sub" style="margin-top:10px">No warnings.</div>'}
+    </div>`;
+  }).join('');
+
+  root.innerHTML = `<div class="role-grid">${cards}</div>`;
+}
+
+function renderRoleBody(role, r) {
+  if (role === 'data_steward') {
+    const o = r.odds || {}, w = r.weather || {}, p = r.player_lineups || {};
+    const u = r.upcoming || {};
+    return `
+      ${bar('Historical odds', o.coverage_pct)}
+      ${bar('Weather',         w.coverage_pct)}
+      ${bar('Player lineups',  p.coverage_pct)}
+      <div class="sub" style="margin-top:8px">Upcoming without odds: <strong>${u.upcoming_without_odds ?? '—'}</strong> / ${u.upcoming_total ?? '—'}</div>`;
+  }
+  if (role === 'feature_engineer') {
+    const n = r.n_rows ?? '—', c = r.n_cols ?? '—';
+    const leakErr = r.leakage?.n_errors ?? 0;
+    return `<div class="sub">Parquet: ${n} rows × ${c} cols · Leakage errors: <strong>${leakErr}</strong></div>`;
+  }
+  if (role === 'model_engineer') {
+    const top = (r.leaderboard || []).slice(0, 3);
+    if (!top.length) return '<div class="sub">No trained models yet.</div>';
+    return top.map(m => `
+      <div class="bar-row"><span class="lbl">${escapeHtml(m.model_name)}</span>
+        <span class="bar"><span style="width:${Math.max(0, (1 - (m.brier_score || 0) / 0.25)) * 100}%"></span></span>
+        <span class="val">${m.brier_score?.toFixed(4) ?? '—'}</span></div>`).join('');
+  }
+  if (role === 'risk_manager') {
+    const t = r.today || {}, d = r.drawdown || {}, rd = r.readiness || {};
+    return `<div class="sub">
+      Today: <strong>${t.n ?? 0}</strong> recs · Kelly max <strong>${t.kelly_max?.toFixed(4) ?? '—'}</strong> (cap ${r.max_kelly_fraction})<br>
+      Settled: ${d.n_settled ?? 0} · Max drawdown <strong>${d.max_drawdown_units?.toFixed(3) ?? '—'}</strong> units<br>
+      Readiness: <strong>${rd.overall || '—'}</strong>
+    </div>`;
+  }
+  if (role === 'quant_reviewer') {
+    const clv = r.clv || {}, tr = r.trend || {}, g = r.clv_first_gate || {};
+    return `<div class="sub">
+      CLV: beat-rate <strong>${clv.beat_closing_line != null ? (clv.beat_closing_line*100).toFixed(1)+'%' : '—'}</strong>
+        · avg <strong>${clv.avg_clv_pct != null ? clv.avg_clv_pct.toFixed(2)+'%' : '—'}</strong><br>
+      Trend: <strong>${tr.verdict || '—'}</strong> (Δ ROI ${tr.delta_roi != null ? (tr.delta_roi*100).toFixed(2)+'%' : '—'})<br>
+      CLV-first gate: <strong>${g.passed ? 'PASS' : 'BLOCKED'}</strong>
+    </div>`;
+  }
+  return '';
+}
+
+function bar(label, pct) {
+  const v = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  const color = pct == null ? 'var(--muted)' : (pct >= 90 ? 'var(--green)' : pct >= 50 ? 'var(--yellow)' : 'var(--red)');
+  return `<div class="bar-row">
+    <span class="lbl">${label}</span>
+    <span class="bar"><span style="width:${v}%;background:${color}"></span></span>
+    <span class="val">${pct == null ? '—' : pct.toFixed(1) + '%'}</span>
+  </div>`;
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+
+// ===========================================================================
+// CALIBRATION TAB
+// ===========================================================================
+
+async function loadCalibrationInit() {
+  _calibrationLoaded = true;
+  // Populate model selector from /dashboard/performance
+  try {
+    const perf = await fetch(`${API}/dashboard/performance`).then(r => r.json());
+    const sel = document.getElementById('cal-model');
+    const models = (perf.model_runs || [])
+      .filter(m => m.brier != null)
+      .sort((a, b) => a.brier - b.brier);
+    sel.innerHTML = `<option value="">Best (by Brier)</option>` +
+      models.map(m => `<option value="${escapeHtml(m.model)}">${escapeHtml(m.model)} — Brier ${m.brier.toFixed(4)}</option>`).join('');
+  } catch { /* ignore */ }
+  loadCalibration();
+}
+
+async function loadCalibration() {
+  const sel = document.getElementById('cal-model');
+  const model = sel ? sel.value : '';
+  const url = `${API}/dashboard/calibration${model ? '?model=' + encodeURIComponent(model) : ''}`;
+
+  document.getElementById('cal-ece').innerHTML  = 'ECE <strong>…</strong>';
+  document.getElementById('cal-n').innerHTML    = 'n settled <strong>…</strong>';
+  document.getElementById('cal-name').innerHTML = '';
+
+  try {
+    const data = await fetch(url).then(r => r.json());
+    if (!data.available) {
+      document.getElementById('cal-empty').style.display = 'block';
+      document.getElementById('cal-ece').innerHTML  = 'ECE <strong>—</strong>';
+      document.getElementById('cal-n').innerHTML    = 'n settled <strong>—</strong>';
+      return;
+    }
+    document.getElementById('cal-empty').style.display = 'none';
+    const eceColor = data.ece > 0.10 ? 'red' : data.ece > 0.05 ? 'amber' : 'green';
+    document.getElementById('cal-ece').innerHTML  = `ECE <strong class="${eceColor}">${data.ece?.toFixed(4) ?? '—'}</strong>`;
+    document.getElementById('cal-n').innerHTML    = `n settled <strong>${data.n_settled}</strong>`;
+    document.getElementById('cal-name').innerHTML = `Model <strong>${escapeHtml(data.model_run.model_name)}</strong>`;
+    renderReliability(data.reliability_bins);
+    renderPhaseBrier(data.per_phase);
+  } catch (err) {
+    document.getElementById('cal-ece').innerHTML = `<span class="red">error: ${err.message}</span>`;
+  }
+}
+
+function renderReliability(bins) {
+  const ctx = document.getElementById('chart-reliability');
+  if (_charts.reliability) _charts.reliability.destroy();
+
+  // Accept several possible key names emitted by backtesting.calibration_bins
+  const points = (bins || []).map(b => {
+    const x = b.mean_predicted ?? b.mean_pred ?? b.bin_mid ?? b.predicted ?? b.center ?? null;
+    const y = b.actual_fraction ?? b.observed_rate ?? b.actual_rate ?? b.frequency ?? b.observed ?? null;
+    const n = b.count ?? b.n ?? b.size ?? null;
+    if (x == null || y == null) return null;
+    return { x: +x, y: +y, r: n ? Math.max(3, Math.min(14, Math.sqrt(n))) : 5 };
+  }).filter(Boolean);
+
+  _charts.reliability = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'Observed',
+          data: points,
+          backgroundColor: '#4f8ef7',
+          borderColor: '#4f8ef7',
+        },
+        {
+          label: 'Perfect calibration',
+          data: [{x:0, y:0}, {x:1, y:1}],
+          type: 'line',
+          borderColor: '#6b7280',
+          borderDash: [4, 4],
+          borderWidth: 1,
+          pointRadius: 0,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { min: 0, max: 1, title: { display: true, text: 'Predicted probability' }, grid: { color: '#2a2d3a' } },
+        y: { min: 0, max: 1, title: { display: true, text: 'Observed rate' }, grid: { color: '#2a2d3a' } },
+      },
+      plugins: { legend: { labels: { color: '#e2e8f0' } } },
+    },
+  });
+}
+
+function renderPhaseBrier(perPhase) {
+  const ctx = document.getElementById('chart-phase-brier');
+  if (_charts.phaseBrier) _charts.phaseBrier.destroy();
+  const labels = ['preseason', 'early', 'mid', 'finals'];
+  const brier = labels.map(l => perPhase?.[l]?.brier ?? null);
+  const ns    = labels.map(l => perPhase?.[l]?.n ?? 0);
+
+  _charts.phaseBrier = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels.map((l, i) => `${l} (n=${ns[i]})`),
+      datasets: [{ label: 'Brier', data: brier, backgroundColor: '#a855f7' }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true, suggestedMax: 0.3, grid: { color: '#2a2d3a' } },
+        x: { grid: { display: false } },
+      },
+      plugins: { legend: { display: false } },
+    },
+  });
+}
+
+// ===========================================================================
+// DISCORD COMPARISON (top block on Discord tab)
+// ===========================================================================
+
+async function loadDiscordComparison() {
+  const root = document.getElementById('discord-compare-root');
+  if (!root) return;
+  try {
+    const data = await fetch(`${API}/discord/comparison`).then(r => r.json());
+    if (!data.available) { root.innerHTML = ''; return; }
+    const s = data.summary;
+    const pct = v => v == null ? '—' : (v * 100).toFixed(1) + '%';
+    const num = v => v == null ? '—' : v;
+
+    const authors = (data.per_author || []).slice(0, 8).map(a => `
+      <tr>
+        <td>${escapeHtml(a.author)}</td>
+        <td>${a.n}</td>
+        <td>${pct(a.agreement_rate)}</td>
+        <td>${a.settled}</td>
+        <td>${pct(a.discord_hit_rate)}</td>
+      </tr>`).join('');
+
+    root.innerHTML = `
+      <div class="dc-compare">
+        <h3>Model vs Discord — ${s.n_matched} picks matched</h3>
+        <div class="dc-compare-cards">
+          <div class="dc-stat"><div class="lbl">Agreement</div><div class="val">${pct(s.agreement_rate)}</div></div>
+          <div class="dc-stat"><div class="lbl">We Agreed</div><div class="val green">${num(s.n_agree)}</div></div>
+          <div class="dc-stat"><div class="lbl">We Disagreed</div><div class="val red">${num(s.n_disagree)}</div></div>
+          <div class="dc-stat"><div class="lbl">Didn't Bet</div><div class="val">${num(s.n_we_didnt_bet)}</div></div>
+          <div class="dc-stat"><div class="lbl">Unmatched</div><div class="val">${num(s.n_unmatched)}</div></div>
+          <div class="dc-stat"><div class="lbl">ROI When We Disagree</div><div class="val ${s.roi_when_disagree >= 0 ? 'green' : 'red'}">${pct(s.roi_when_disagree)}</div></div>
+        </div>
+        ${authors ? `
+          <div class="table-wrap" style="margin-top:14px">
+            <table>
+              <thead><tr><th>Tipster</th><th>Matched</th><th>Agreement</th><th>Settled</th><th>Discord hit rate</th></tr></thead>
+              <tbody>${authors}</tbody>
+            </table>
+          </div>` : ''}
+      </div>`;
+  } catch { /* silent — the history list below is enough on its own */ }
+}
+
+// Patch the original loadDiscord to also load the comparison block
+const _origLoadDiscord = loadDiscord;
+loadDiscord = async function() {
+  await _origLoadDiscord();
+  loadDiscordComparison();
+};
+
+// ===========================================================================
+// Bootstrap
+// ===========================================================================
+loadMain();
+setInterval(loadMain, 60_000);
+</script>
+</body>
+</html>

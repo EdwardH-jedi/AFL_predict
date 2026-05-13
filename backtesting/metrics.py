@@ -25,14 +25,13 @@ Metrics tracked:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import brier_score_loss, log_loss
 
 from backtesting.calibration import expected_calibration_error
-
 
 # ---------------------------------------------------------------------------
 # Result dataclass
@@ -113,7 +112,7 @@ def compute_metrics(
     # --- Probability metrics on settled matches only ---
     settled_mask = actuals.notna()
     y_true = actuals[settled_mask].astype(int).values
-    y_prob = predictions_df.loc[settled_mask, "home_win_prob"].values
+    y_prob = predictions_df.loc[settled_mask.values, "home_win_prob"].values
     n_settled = int(settled_mask.sum())
 
     if n_settled < 2:
@@ -142,7 +141,11 @@ def compute_metrics(
         # hit_rate: fraction of bets where the recommended side actually won
         if n_bets > 0 and "won" in simulated_bets.columns:
             settled_bets = simulated_bets.dropna(subset=["won"])
-            hit_rate = round(float(settled_bets["won"].mean()), 6) if len(settled_bets) > 0 else math.nan
+            hit_rate = (
+                round(float(settled_bets["won"].mean()), 6)
+                if len(settled_bets) > 0
+                else math.nan
+            )
         else:
             hit_rate = math.nan
 
@@ -153,7 +156,11 @@ def compute_metrics(
             avg_edge = math.nan
 
         # ROI: profit / staked
-        total_staked = float(simulated_bets["stake_fraction"].sum()) if "stake_fraction" in simulated_bets.columns else 0.0
+        total_staked = (
+            float(simulated_bets["stake_fraction"].sum())
+            if "stake_fraction" in simulated_bets.columns
+            else 0.0
+        )
         if total_staked > 0 and "profit" in simulated_bets.columns:
             net_profit = float(simulated_bets["profit"].sum())
             roi = round(net_profit / total_staked, 6)

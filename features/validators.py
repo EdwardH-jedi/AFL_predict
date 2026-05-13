@@ -18,7 +18,7 @@ validators for user input.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 # ---------------------------------------------------------------------------
 # Leakage guards
@@ -39,28 +39,39 @@ def check_leakage(row: dict, match_time: datetime | None) -> list[str]:
 
     Args:
         row:        Feature dict for one match.
-        match_time: The match's scheduled time (UTC-aware). Pass None if unknown.
+        match_time: The match's scheduled time (may be naive or UTC-aware).
+                    SQLite returns naive datetimes; aware datetimes are also handled.
 
     Returns:
         List of issue strings (empty if clean).
     """
     issues: list[str] = []
-    now = datetime.now(tz=timezone.utc)
+    # Use naive UTC to match SQLite's naive datetime output.
+    # SQLite strips tzinfo on storage, so match_time is always naive when
+    # read back from the DB — comparing it to an aware datetime raises TypeError.
+    now = datetime.utcnow()
 
     # For a future match, home_win should not be set
-    if match_time is not None and match_time > now:
+    # Strip tzinfo defensively in case match_time came from a non-SQLite source.
+    mt = match_time.replace(tzinfo=None) if match_time is not None else None
+    if mt is not None and mt > now:
         if row.get("home_win") is not None:
             issues.append(
                 f"Leakage: home_win={row['home_win']} is set for a future match "
-                f"(match_time={match_time.isoformat()})."
+                f"(match_time={mt.isoformat()})."
             )
 
-    # Result columns should never appear in a feature row
-    for col in _RESULT_COLUMNS:
-        if col in row:
-            issues.append(
-                f"Leakage: column {col!r} should not appear in feature rows."
-            )
+    # Score/result columns must not be populated for future matches.
+    # They are allowed in the row dict (e.g. for Poisson training) as long as
+    # they are None/NaN for any match that hasn't been played yet.
+    if mt is not None and mt > now:
+        for col in _RESULT_COLUMNS:
+            val = row.get(col)
+            if val is not None:
+                issues.append(
+                    f"Leakage: column {col!r} is populated for a future match "
+                    f"(value={val!r}, match_time={mt.isoformat()})."
+                )
 
     return issues
 

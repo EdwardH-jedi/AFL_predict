@@ -14,7 +14,6 @@ This is a SOFT job — failure is logged but does not stop the pipeline.
 """
 
 import json
-import os
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -31,7 +30,10 @@ from db.models.pipeline_runs import PipelineRun
 from db.models.predictions import Prediction
 from db.models.recommendations import Recommendation
 from db.session import db_session
-from orchestration.jobs.check_data_freshness import get_last_result as get_freshness
+from orchestration.jobs.check_data_freshness import (
+    build_report as build_freshness_report,
+    get_last_result as get_freshness,
+)
 
 settings = get_settings()
 
@@ -51,19 +53,23 @@ def run() -> None:
     today = date.today().isoformat()
     logger.info(f"==> generate_daily_summary: building summary for {today}")
 
-    summary = _build_summary()
-
-    output_dir = Path(settings.daily_summary_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"{today}.json"
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(summary, f, indent=2, default=str)
+    output_path = write_summary_artifact()
 
     duration = time.monotonic() - start
     logger.info(
         f"==> generate_daily_summary: wrote {output_path} in {duration:.1f}s"
     )
+
+
+def write_summary_artifact() -> Path:
+    """Build and write today's summary artifact, returning the output path."""
+    summary = _build_summary()
+    output_dir = Path(settings.daily_summary_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{date.today().isoformat()}.json"
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2, default=str)
+    return output_path
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +87,7 @@ def _build_summary() -> dict[str, Any]:
         outcomes_section = _recent_outcomes(db, limit=20)
         no_bet_section = _no_bet_analysis(recs_section)
 
-    freshness = get_freshness() or {}
+    freshness = get_freshness() or build_freshness_report()
 
     return {
         "date": today.isoformat(),

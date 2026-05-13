@@ -42,9 +42,15 @@ _HOME_ADVANTAGE: float = 50.0
 _REGRESSION_FACTOR: float = 0.75  # keep 75% of prior ELO; 25% regresses to mean
 
 
-def _expected_win(elo_home: float, elo_away: float) -> float:
-    """Expected win probability for home team (includes home advantage)."""
-    return 1.0 / (1.0 + 10.0 ** ((elo_away - (elo_home + _HOME_ADVANTAGE)) / 400.0))
+def _expected_win(elo_home: float, elo_away: float, neutral: bool = False) -> float:
+    """Expected win probability for home team.
+
+    Applies home advantage only when the team is playing at their actual home
+    ground (neutral=False). For Gather Round and other neutral venues, no
+    advantage is applied.
+    """
+    advantage = 0.0 if neutral else _HOME_ADVANTAGE
+    return 1.0 / (1.0 + 10.0 ** ((elo_away - (elo_home + advantage)) / 400.0))
 
 
 def _outcome(result: str | None) -> float | None:
@@ -100,7 +106,8 @@ class EloExtractor(BaseExtractor):
                 # Incomplete or no result — skip update
                 continue
 
-            expected = _expected_win(home_elo, away_elo)
+            neutral = getattr(match, "is_neutral_venue", False)
+            expected = _expected_win(home_elo, away_elo, neutral=neutral)
             delta = _K_FACTOR * (outcome - expected)
             ratings[home_id] = home_elo + delta
             ratings[away_id] = away_elo - delta

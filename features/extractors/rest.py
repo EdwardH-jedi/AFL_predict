@@ -18,7 +18,7 @@ Leakage policy:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from loguru import logger
 
@@ -75,8 +75,16 @@ def _days_between(prior: datetime | None, current: datetime) -> int | None:
     Return the number of whole calendar days between two datetimes.
 
     Returns None if prior is None (team's first recorded match).
+
+    Strips tzinfo before subtraction: SQLite returns naive datetimes, but
+    some rows may have been created with UTC-aware datetimes (e.g. from
+    a different ingestion path). Normalising both to naive prevents
+    TypeError: can't compare offset-naive and offset-aware datetimes.
     """
     if prior is None:
         return None
-    delta = current - prior
+    # Strip tzinfo from both so subtraction works regardless of source
+    p = prior.replace(tzinfo=None)
+    c = current.replace(tzinfo=None)
+    delta = c - p
     return max(0, delta.days)

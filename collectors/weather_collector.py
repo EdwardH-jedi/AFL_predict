@@ -28,7 +28,7 @@ Parameters fetched (hourly, at match kickoff hour):
 from __future__ import annotations
 
 import time
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import httpx
 from loguru import logger
@@ -147,7 +147,7 @@ class WeatherCollector:
             Number of weather snapshots created/updated.
         """
         today = date.today()
-        cutoff = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+        cutoff = datetime(today.year, today.month, today.day, tzinfo=UTC)
         from datetime import timedelta
         end_cutoff = cutoff + timedelta(days=days_ahead)
 
@@ -165,7 +165,9 @@ class WeatherCollector:
                 count += 1
             time.sleep(_REQUEST_DELAY)
 
-        logger.info(f"WeatherCollector: fetched forecast for {count}/{len(matches)} upcoming matches.")
+        logger.info(
+            f"WeatherCollector: fetched forecast for {count}/{len(matches)} upcoming matches."
+        )
         return count
 
     def fetch_historical(self, season: int) -> int:
@@ -201,7 +203,10 @@ class WeatherCollector:
                 count += 1
             time.sleep(_REQUEST_DELAY)
 
-        logger.info(f"WeatherCollector: backfilled {count}/{len(matches)} historical weather records for {season}.")
+        logger.info(
+            f"WeatherCollector: backfilled {count}/{len(matches)} "
+            f"historical weather records for {season}."
+        )
         return count
 
     # ---------------------------------------------------------------------------
@@ -216,7 +221,7 @@ class WeatherCollector:
         lat, lon = get_venue_coords(match.venue)
         match_dt = match.match_time
         if match_dt.tzinfo is None:
-            match_dt = match_dt.replace(tzinfo=timezone.utc)
+            match_dt = match_dt.replace(tzinfo=UTC)
 
         date_str = match_dt.strftime("%Y-%m-%d")
 
@@ -291,7 +296,17 @@ class WeatherCollector:
         snap.is_extreme_heat = int(heat)
         snap.source_type = source_type
 
-        self._db.commit()
+        try:
+            self._db.commit()
+        except Exception as exc:
+            # UNIQUE constraint (duplicate) — another run already inserted this row.
+            # Roll back the failed transaction and continue gracefully.
+            self._db.rollback()
+            logger.debug(
+                f"WeatherCollector: skipping match {match.id} after commit error "
+                f"(probably duplicate): {exc}"
+            )
+            return False
         return True
 
     @staticmethod
