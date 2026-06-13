@@ -41,7 +41,7 @@ from db.models.matches import Match
 from features.extractors.base import BaseExtractor
 
 _MAX_WINDOW: int = 10
-
+_DEFAULT_WINDOW: int = _MAX_WINDOW
 
 @dataclass
 class _GameRecord:

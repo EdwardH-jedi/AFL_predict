@@ -6,7 +6,7 @@ Unit tests for the collectors/transformers/ layer.
 No network calls, no database — pure function testing.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -24,8 +24,8 @@ from collectors.transformers.odds_transformer import (
     odds_event_to_update_kwargs,
 )
 
-_NOW = datetime(2025, 5, 1, 9, 0, tzinfo=timezone.utc)
-_MATCH_TIME = datetime(2025, 5, 1, 9, 30, tzinfo=timezone.utc)
+_NOW = datetime(2025, 5, 1, 9, 0, tzinfo=UTC)
+_MATCH_TIME = datetime(2025, 5, 1, 9, 30, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ class TestGameToResultKwargs:
 class TestGameToScheduleKwargs:
     def test_contains_only_schedule_fields(self):
         kwargs = game_to_schedule_kwargs(_game())
-        assert set(kwargs.keys()) == {"match_time", "venue", "round_label"}
+        assert set(kwargs.keys()) == {"match_time", "venue", "round_label", "is_neutral_venue"}
 
     def test_values_match_game(self):
         kwargs = game_to_schedule_kwargs(_game())
