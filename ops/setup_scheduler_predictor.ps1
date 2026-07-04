@@ -92,15 +92,14 @@ Register-AflTask `
     -Arguments   "-m orchestration.jobs.train_models" `
     -Trigger     $t2
 
-# Task 3: Bet notifications - 10:00
-Write-Host ""
-Write-Host "[Task 3] Bet notifications - 10:00 daily"
-$t3 = New-ScheduledTaskTrigger -Daily -At "10:00"
-Register-AflTask `
-    -TaskName    "AFL_NotifyBets" `
-    -Description "AFL Predict daily bet notification" `
-    -Arguments   "-m orchestration.jobs.notify_bets" `
-    -Trigger     $t3
+# notify_bets already runs inside the 09:30 predictor pipeline; a separate
+# scheduled task would double-post to Discord. Remove it if a previous
+# version of this script registered one.
+if (Get-ScheduledTask -TaskName "AFL_NotifyBets" -ErrorAction SilentlyContinue) {
+    Unregister-ScheduledTask -TaskName "AFL_NotifyBets" -Confirm:$false
+    Write-Host ""
+    Write-Host "[Cleanup] Removed AFL_NotifyBets (duplicate of pipeline notify_bets)"
+}
 
 # Summary
 Write-Host ""

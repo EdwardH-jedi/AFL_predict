@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -51,7 +51,7 @@ def run() -> None:
         readiness = _readiness_snapshot()
 
     report = {
-        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "generated_at": datetime.now(tz=UTC).isoformat(),
         "paper_trade_only": settings.paper_trade_only,
         "max_kelly_fraction": settings.max_kelly_fraction,
         "min_edge_threshold": settings.min_edge_threshold,
@@ -76,7 +76,7 @@ def run() -> None:
 # ---------------------------------------------------------------------------
 
 def _today_recs(db: Session, today: date) -> list[dict[str, Any]]:
-    start_dt = datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc)
+    start_dt = datetime.combine(today, datetime.min.time(), tzinfo=UTC)
     rows: list[Recommendation] = (
         db.query(Recommendation)
         .filter(Recommendation.created_at >= start_dt)
@@ -169,7 +169,7 @@ def _drawdown_snapshot(db: Session) -> dict[str, Any]:
 
 def _readiness_snapshot() -> dict[str, Any]:
     try:
-        from evaluation.live_readiness import evaluate_readiness  # type: ignore
+        from evaluation.live_readiness import evaluate as evaluate_readiness
     except Exception as exc:
         return {"available": False, "reason": f"evaluate_readiness not importable: {exc}"}
     try:
@@ -195,7 +195,9 @@ def _verdict(report: dict[str, Any]) -> tuple[str, list[str]]:
     readiness = report.get("readiness", {})
     if readiness.get("available") and str(readiness.get("overall", "")).lower() == "ready":
         if (report.get("drawdown", {}).get("n_settled") or 0) < settings.readiness_min_settled_bets:
-            warnings.append("Readiness reports 'ready' but settled-bet sample is below the CLV-gate minimum.")
+            warnings.append(
+                "Readiness reports 'ready' but settled-bet sample is below the CLV-gate minimum."
+            )
 
     if report["invariant_violations"]:
         return "critical", warnings

@@ -1,4 +1,4 @@
-# register_tasks.ps1
+﻿# register_tasks.ps1
 # AFL Predict - Windows Task Scheduler 자동 등록
 #
 # 사용법 (관리자 PowerShell):
@@ -6,8 +6,9 @@
 #   .\register_tasks.ps1            # 서버용 (기본)
 #   .\register_tasks.ps1 -Role predictor  # 메인(RTX 5080)용
 #
-# 서버 (RX 6600) : AFL_FetchWeather (매일 07:00) + AFL_DailyPipeline (매일 08:00) + AFL_WeeklyTrain
+# 서버 (RX 6600) : AFL_FetchWeather (매일 07:00) + AFL_DailyPipeline (매일 08:00)
 # 메인 (RTX 5080): AFL_WeeklyTrain (매주 일요일 03:00) 만 등록
+# 학습(AFL_WeeklyTrain)은 RTX 5080 CUDA + 로컬 아티팩트가 필요하므로 서버에 등록하지 않는다.
 
 param(
     [string]$Role = "server"   # "server" | "predictor"
@@ -61,8 +62,7 @@ function Register-AflTask {
 
     $settings = New-ScheduledTaskSettingsSet `
         -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
-        -StartWhenAvailable `
-        -RunOnlyIfNetworkAvailable $false
+        -StartWhenAvailable
 
     # 현재 로그인 사용자 권한으로 실행 (패스워드 저장 없이)
     $principal = New-ScheduledTaskPrincipal `
@@ -113,11 +113,11 @@ if ($Role -eq "server") {
         -TriggerDesc "매일 08:00" `
         -Trigger (New-ScheduledTaskTrigger -Daily -At "08:00AM")
 
-    Register-AflTask `
-        -Name "AFL_WeeklyTrain" `
-        -BatFile (Join-Path $TasksDir "run_weekly_train.bat") `
-        -TriggerDesc "매주 일요일 03:00" `
-        -Trigger (New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At "03:00AM")
+    # 과거 버전이 서버에 등록했던 학습 작업이 남아 있으면 제거
+    if (Get-ScheduledTask -TaskName "AFL_WeeklyTrain" -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName "AFL_WeeklyTrain" -Confirm:$false
+        Write-Host "  (서버에서 AFL_WeeklyTrain 제거 — 학습은 RTX 5080 전용)" -ForegroundColor Yellow
+    }
 
 } elseif ($Role -eq "predictor") {
     Write-Host "-- 메인(RTX 5080) 작업 등록 --" -ForegroundColor Yellow

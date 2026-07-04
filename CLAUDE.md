@@ -166,3 +166,41 @@ resolve are emitted as `null` or zero so the dashboard still renders.
 | `make notify` | Send today's value picks to the Discord webhook |
 | `make test` | Run pytest |
 | `make lint` | `ruff check .` |
+
+## Two-machine operation (RX 6600 + RTX 5080)
+
+The system runs across two Windows machines sharing one PostgreSQL DB:
+
+| Machine | NODE_ROLE | Duty |
+|---|---|---|
+| RX 6600 desktop | `collector` | **24/7**: PostgreSQL host, FastAPI :8000, daily ingestion (fixtures/odds/weather) |
+| RTX 5080 main | `predictor` | On-demand: feature build, inference, recommendations, Discord notify, weekly CUDA training |
+
+`orchestration/daily_pipeline.py` filters its job list by `NODE_ROLE` (.env).
+**Canonical schedule, failure modes, and setup-script caveats: `ops/orchestration_24_7.md`**
+(install steps: `ops/machine_workflows.md`). When schedules in docs/scripts
+disagree, `ops/orchestration_24_7.md` wins.
+
+## 하네스: AFL Predict 역할 에이전트
+
+**목표:** 데이터 → 피처 → 모델 → 리스크 → 리뷰의 일일 체인을 역할별 전문 에이전트로 처리한다.
+
+**에이전트 팀** (`.claude/agents/`):
+| 에이전트 | 역할 |
+|---------|------|
+| data-steward | 원천 데이터 커버리지/신선도 (역사적 오즈, 선수 가용성, 날씨) |
+| feature-engineer | 피처 파이프라인, parquet 빌드, 누수 검증 |
+| model-engineer | 학습/HPO/캘리브레이션/앙상블 (RTX 5080 CUDA 타깃) |
+| risk-manager | Kelly 스테이킹, 기권 규칙, 라이브 준비도 게이트 |
+| quant-reviewer | CLV, 부트스트랩 CI, 캘리브레이션 진단 — 독립 평가 권한 |
+
+**실행 규칙:**
+- 데이터/피처/모델/스테이킹/평가 작업 요청 시 해당 역할 에이전트에 위임하라. 실행 순서는 data → features → models → risk → reviewer.
+- 단순 질문/조회는 에이전트 없이 직접 응답해도 무방.
+- 각 에이전트의 파이프라인 대응 잡은 `orchestration/jobs/roles/*.py` (일일 자동 감사).
+- `.claude/skills/`는 아직 없음 — 오케스트레이터 스킬 미구축 상태.
+
+**변경 이력:**
+| 날짜 | 변경 내용 | 대상 | 사유 |
+|------|----------|------|------|
+| 2026-07-04 | 하네스 컨텍스트 등록 (에이전트 5종은 기존재) + 듀얼 머신 운영 섹션 추가 | CLAUDE.md, ops/orchestration_24_7.md | 하네스 드리프트 해소, RX6600 24h 운영 기준 수립 |

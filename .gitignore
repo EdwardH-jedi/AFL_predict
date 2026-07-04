@@ -33,3 +33,8 @@ build/
 
 # Claude Code local settings
 .claude/
+
+# generated artifacts
+reviews/
+data/
+static/quant-dashboard/predictions.json

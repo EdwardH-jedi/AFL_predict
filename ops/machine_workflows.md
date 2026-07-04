@@ -25,7 +25,7 @@ python --version
 | 머신 | 경로 |
 |------|------|
 | 서버 컴퓨터 (RX 6600) | `C:\Users\edwar\AFL_predict` |
-| 메인 컴퓨터 (RTX 5080) | `C:\Users\user\OneDrive\바탕 화면\AFL_predict` |
+| 메인 컴퓨터 (RTX 5080) | `C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict` |
 
 ### 3. venv 생성 및 패키지 설치 (각 머신에서 독립적으로)
 
@@ -39,7 +39,7 @@ pip install -r requirements.txt
 
 **메인:**
 ```cmd
-cd "C:\Users\user\OneDrive\바탕 화면\AFL_predict"
+cd "C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict"
 python -m venv .venv
 .venv\Scripts\activate.bat
 pip install -r requirements.txt
@@ -207,7 +207,7 @@ mkdir "C:\Users\edwar\AFL_predict\logs"
 ### Step 1 — .env 파일 생성
 
 ```cmd
-cd "C:\Users\user\OneDrive\바탕 화면\AFL_predict"
+cd "C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict"
 copy .env.example .env
 ```
 
@@ -249,15 +249,15 @@ python -c "from db.session import SessionLocal; db=SessionLocal(); print('DB con
 
 아래 2개 작업을 등록합니다.
 
-**작업 1: 일일 파이프라인 — predictor (매일 09:00)**
+**작업 1: 일일 파이프라인 — predictor (매일 09:30)**
 
 서버 collector 파이프라인(08:00)이 끝난 뒤 실행합니다.
 
 - 이름: `AFL_DailyPipeline_Predictor`
-- 트리거: 매일 09:00
+- 트리거: 매일 09:30
 - 동작: 프로그램/스크립트
   ```
-  C:\Users\user\OneDrive\바탕 화면\AFL_predict\.venv\Scripts\python.exe
+  C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict\.venv\Scripts\python.exe
   ```
   인수:
   ```
@@ -265,7 +265,7 @@ python -c "from db.session import SessionLocal; db=SessionLocal(); print('DB con
   ```
   시작 위치:
   ```
-  C:\Users\user\OneDrive\바탕 화면\AFL_predict
+  C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict
   ```
 
 실행 내용 (NODE_ROLE=predictor 기준):
@@ -274,12 +274,12 @@ python -c "from db.session import SessionLocal; db=SessionLocal(); print('DB con
 - `notify_bets` — Discord/Telegram 알림
 - `settle_results` — 종료 경기 결과 정산
 
-**작업 2: 주간 모델 재학습 (일요일 04:00)**
+**작업 2: 주간 모델 재학습 (일요일 03:00)**
 
 서버 날씨 수집(07:00) 전에 완료됩니다. 서버가 켜져 있어야 DB 저장 가능.
 
 - 이름: `AFL_WeeklyTrain`
-- 트리거: 매주 일요일 04:00
+- 트리거: 매주 일요일 03:00
 - 동작: 위와 동일, 인수:
   ```
   -m orchestration.jobs.train_models
