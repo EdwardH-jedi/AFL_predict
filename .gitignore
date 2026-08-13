@@ -1,5 +1,7 @@
 # Environment
 .env
+.env.local
+.env.*.local
 .venv/
 venv/
 __pycache__/
@@ -38,3 +40,12 @@ build/
 reviews/
 data/
 static/quant-dashboard/predictions.json
+storage/daily_summaries/**/*.json
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
