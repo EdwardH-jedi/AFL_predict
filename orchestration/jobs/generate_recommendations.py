@@ -61,15 +61,10 @@ _MODEL_REGISTRY: dict[str, type[BaseModel]] = {
 # 'bookmaker_baseline' / 'elo_baseline' (set by BaseModel.name on each class).
 _STATELESS_MODELS = {"bookmaker", "bookmaker_baseline", "elo", "elo_baseline"}
 
-# Ensemble component weights.
-# XGBoost/Logistic share the heavy lifting; Poisson adds score-distribution
-# calibration; ELO acts as a stable low-variance regulariser.
-_ENSEMBLE_WEIGHTS: dict[str, float] = {
-    "logistic_baseline": 0.30,
-    "xgboost": 0.35,
-    "poisson": 0.20,
-    "elo_baseline": 0.15,
-}
+# Ensemble component weights come from config.settings — see
+# Settings.ensemble_weights, which is the single source of truth for the
+# production blend. Do NOT reintroduce a module-level weight table here: the
+# dashboard API reads the same property, and two tables drift apart silently.
 
 
 def run() -> None:
@@ -197,7 +192,15 @@ def _try_build_ensemble(db):
     ref_run = None
     first_loaded_run = None
 
-    for model_name, weight in _ENSEMBLE_WEIGHTS.items():
+    weights = settings.ensemble_weights
+    if not weights:
+        logger.warning(
+            "_try_build_ensemble: no positive ensemble weights configured "
+            "(check ENSEMBLE_WEIGHT_* in .env) -- falling back to single best model."
+        )
+        return None, None
+
+    for model_name, weight in weights.items():
         candidates = (
             db.query(ModelRun)
             .filter(

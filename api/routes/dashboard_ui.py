@@ -180,10 +180,29 @@ class OddsTrackerResponse(BaseModel):
 # --- backtest-summary ---
 
 class EnsembleWeights(BaseModel):
-    bookmaker: float
-    elo: float
+    """Production ensemble blend as reported to the dashboard.
+
+    Sourced from Settings.ensemble_weights (the single source of truth), keyed
+    here by short display name. A component absent from that property carries a
+    non-positive configured weight and is reported as 0.0.
+    """
+
+    logistic: float
     xgboost: float
     poisson: float
+    elo: float
+    bookmaker: float
+
+    @classmethod
+    def from_settings(cls) -> EnsembleWeights:
+        weights = settings.ensemble_weights
+        return cls(
+            logistic=weights.get("logistic_baseline", 0.0),
+            xgboost=weights.get("xgboost", 0.0),
+            poisson=weights.get("poisson", 0.0),
+            elo=weights.get("elo_baseline", 0.0),
+            bookmaker=weights.get("bookmaker_baseline", 0.0),
+        )
 
 
 class BacktestSummaryResponse(BaseModel):
@@ -544,12 +563,7 @@ def odds_tracker(db: DbSession) -> OddsTrackerResponse:
 
 @router.get("/backtest-summary", response_model=BacktestSummaryResponse)
 def backtest_summary(db: DbSession) -> BacktestSummaryResponse:
-    weights = EnsembleWeights(
-        bookmaker=settings.ensemble_weight_bookmaker,
-        elo=settings.ensemble_weight_elo,
-        xgboost=settings.ensemble_weight_xgboost,
-        poisson=settings.ensemble_weight_poisson,
-    )
+    weights = EnsembleWeights.from_settings()
 
     artifact, source_date = _load_latest_summary_artifact()
     if artifact is None:

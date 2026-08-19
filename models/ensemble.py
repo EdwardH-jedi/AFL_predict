@@ -4,11 +4,14 @@ models/ensemble.py
 Weighted-average ensemble model combining multiple BaseModel instances.
 """
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
+
 import numpy as np
 import pandas as pd
 from loguru import logger
+
 from models.base_model import BaseModel
 
 
@@ -64,6 +67,59 @@ class Ensemble(BaseModel):
 
 # Alias for import compatibility
 EnsembleModel = Ensemble
+
+
+class TrainableEnsemble(Ensemble):
+    """
+    Ensemble that fits its own components, so it can be evaluated in a backtest.
+
+    The production ensemble (orchestration/jobs/generate_recommendations.py)
+    wraps components that were already fitted and persisted by train_models.
+    A walk-forward backtest has no such artifacts: BacktestRunner calls fit()
+    on every model once per fold. This subclass bridges that gap by forwarding
+    fit() to each component, which is what makes the blend measurable on the
+    same folds and metrics as its parts.
+
+    Weights are supplied by the caller and should come from
+    Settings.ensemble_weights — the single source of truth — so the blend that
+    gets benchmarked is the blend that ships.
+    """
+
+    name = "ensemble"
+
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
+        """
+        Fit every component on the fold's training data.
+
+        A component that fails to fit is dropped rather than aborting the whole
+        blend, mirroring how predict_proba() renormalises over the components
+        that actually responded. Without this, one unavailable dependency (e.g.
+        XGBoost missing its OpenMP runtime) would blank out the ensemble row of
+        an entire backtest instead of degrading it to the remaining models.
+        """
+        fitted = []
+        for model, weight in self.components:
+            try:
+                model.fit(X, y)
+            except Exception as exc:
+                logger.warning(
+                    f"TrainableEnsemble.fit(): {model.name} fit failed ({exc}) — "
+                    "dropping it from this fold's blend."
+                )
+                continue
+            fitted.append((model, weight))
+
+        if not fitted:
+            raise RuntimeError("TrainableEnsemble.fit(): every component failed to fit.")
+
+        # Renormalise over the survivors so the blend stays a proper average.
+        total = sum(w for _, w in fitted)
+        self.components = [(m, w / total) for m, w in fitted]
+        self.weights = {m.name: w for m, w in self.components}
+        logger.debug(
+            f"TrainableEnsemble.fit(): fitted {len(fitted)} component(s) "
+            f"on {len(X)} rows — weights {self.weights}."
+        )
 
 
 def optimize_weights(

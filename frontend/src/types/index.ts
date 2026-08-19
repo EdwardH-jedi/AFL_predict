@@ -134,10 +134,11 @@ export interface OddsTrackerResponse {
 // ---------------------------------------------------------------------------
 
 export interface EnsembleWeights {
-  bookmaker: number;
-  elo: number;
+  logistic: number;
   xgboost: number;
   poisson: number;
+  elo: number;
+  bookmaker: number;
 }
 
 export interface BacktestSummaryResponse {

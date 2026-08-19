@@ -28,6 +28,7 @@ import { BACKTEST_METRICS, DRAWDOWN, LONG_BANKROLL, SEASON_ROI } from "@/lib/moc
 
 const WEIGHT_COLORS: Record<string, string> = {
   xgboost: "#10b981",
+  logistic: "#38bdf8",
   elo: "#7dd3fc",
   poisson: "#a78bfa",
   bookmaker: "#f59e0b",
@@ -53,13 +54,18 @@ export function TabBacktest() {
   // Ensemble pie data — real weights from the backend.
   const weights = data.ensemble_weights;
   const totalWeight =
-    weights.bookmaker + weights.elo + weights.xgboost + weights.poisson || 1;
+    weights.logistic +
+      weights.xgboost +
+      weights.poisson +
+      weights.elo +
+      weights.bookmaker || 1;
   const ensembleData = [
     { name: "XGBoost", value: pct(weights.xgboost, totalWeight), color: WEIGHT_COLORS.xgboost },
-    { name: "ELO", value: pct(weights.elo, totalWeight), color: WEIGHT_COLORS.elo },
+    { name: "Logistic", value: pct(weights.logistic, totalWeight), color: WEIGHT_COLORS.logistic },
     { name: "Poisson", value: pct(weights.poisson, totalWeight), color: WEIGHT_COLORS.poisson },
+    { name: "ELO", value: pct(weights.elo, totalWeight), color: WEIGHT_COLORS.elo },
     { name: "Bookmaker", value: pct(weights.bookmaker, totalWeight), color: WEIGHT_COLORS.bookmaker },
-  ];
+  ].filter((d) => d.value > 0);
 
   const sampled = LONG_BANKROLL.filter(
     (_, i) => i % 4 === 0 || i === LONG_BANKROLL.length - 1,

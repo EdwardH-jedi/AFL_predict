@@ -124,10 +124,61 @@ class Settings(BaseSettings):
     )
 
     # --- Ensemble Weights ---
-    ensemble_weight_bookmaker: float = Field(default=0.30)
-    ensemble_weight_elo: float = Field(default=0.10)
-    ensemble_weight_xgboost: float = Field(default=0.35)
-    ensemble_weight_poisson: float = Field(default=0.25)
+    # SINGLE SOURCE OF TRUTH for the production ensemble blend.
+    #
+    # Keys of `ensemble_weights` below are the *persisted* model names, i.e.
+    # `BaseModel.name` on each component class, which is what gets written to
+    # ModelRun.model_name. They must match exactly or component lookup in
+    # orchestration/jobs/generate_recommendations.py silently finds nothing.
+    #
+    # Weights are relative, not required to sum to 1 — models.ensemble.Ensemble
+    # normalises them, and renormalises again at predict time over whichever
+    # components actually loaded. A component with weight <= 0 is excluded.
+    ensemble_weight_logistic_baseline: float = Field(
+        default=0.30,
+        description="Calibrated logistic regression weight in the production ensemble.",
+    )
+    ensemble_weight_xgboost: float = Field(
+        default=0.35,
+        description="Calibrated XGBoost weight in the production ensemble.",
+    )
+    ensemble_weight_poisson: float = Field(
+        default=0.20,
+        description="Poisson score-distribution model weight in the production ensemble.",
+    )
+    ensemble_weight_elo_baseline: float = Field(
+        default=0.15,
+        description="Elo weight in the production ensemble (low-variance regulariser).",
+    )
+    ensemble_weight_bookmaker_baseline: float = Field(
+        default=0.0,
+        description=(
+            "Bookmaker baseline weight. Defaults to 0.0 on purpose: the bookmaker "
+            "baseline is the benchmark the model is measured against, not a component. "
+            "Blending it in shrinks predictions toward the market and suppresses the "
+            "very edge the recommendation step looks for. Raise it only deliberately."
+        ),
+    )
+
+    @property
+    def ensemble_weights(self) -> dict[str, float]:
+        """
+        Production ensemble weights, keyed by persisted ModelRun.model_name.
+
+        Only components with a strictly positive weight are returned, so a
+        zero-weighted component is genuinely absent from the blend rather than
+        being loaded and multiplied by zero. Consumers (recommendation
+        generation, the dashboard API) must read this property instead of
+        holding their own weight table.
+        """
+        configured = {
+            "logistic_baseline": self.ensemble_weight_logistic_baseline,
+            "xgboost": self.ensemble_weight_xgboost,
+            "poisson": self.ensemble_weight_poisson,
+            "elo_baseline": self.ensemble_weight_elo_baseline,
+            "bookmaker_baseline": self.ensemble_weight_bookmaker_baseline,
+        }
+        return {name: float(w) for name, w in configured.items() if w > 0}
 
     # --- Dual-Machine Architecture ---
     # NODE_ROLE controls which pipeline jobs run on this machine:

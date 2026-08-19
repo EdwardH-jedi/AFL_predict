@@ -21,22 +21,21 @@ CLI usage:
 """
 
 import argparse
+import json
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 from loguru import logger
 
 from backtesting.runner import BacktestRunner
 from config.settings import get_settings
-import json
-
 from models.bookmaker_baseline import BookmakerBaseline
 from models.elo_baseline import EloBaseline
+from models.ensemble import TrainableEnsemble
 from models.logistic_baseline import LogisticBaseline
-from models.xgboost_model import XGBoostModel
 from models.poisson_model import PoissonModel
+from models.xgboost_model import XGBoostModel
 
 settings = get_settings()
 FEATURES_DIR = Path(settings.raw_snapshots_dir) / "features"
@@ -48,9 +47,11 @@ def run(
     min_train_seasons: int = 2,
     edge_threshold: float = 0.03,
     max_kelly_fraction: float | None = None,
+    min_season: int | None = None,
+    max_season: int | None = None,
 ) -> None:
     """
-    Run the full walk-forward backtest for all baseline models.
+    Run the full walk-forward backtest for all baseline models plus the ensemble.
 
     Args:
         mode:               'expanding' or 'rolling'.
@@ -58,6 +59,13 @@ def run(
                             training window size (rolling).
         edge_threshold:     Minimum model edge to recommend a bet.
         max_kelly_fraction: Kelly cap. Defaults to settings.max_kelly_fraction.
+        min_season:         Drop seasons before this year. Use it to restrict the
+                            run to seasons with bookmaker-odds coverage — folds
+                            without odds cannot produce bookmaker-baseline or
+                            decision (ROI/hit-rate) metrics, and mixing them in
+                            makes the aggregate averages incomparable.
+        max_season:         Drop seasons after this year (e.g. exclude an
+                            in-progress season with mostly unsettled matches).
     """
     start = time.monotonic()
     logger.info(
@@ -74,12 +82,24 @@ def run(
         logger.error("run_backtest: no feature data. Run build_features first.")
         return
 
+    df = _filter_seasons(df, min_season=min_season, max_season=max_season)
+    if df.empty:
+        logger.error(
+            f"run_backtest: no rows left after season filter "
+            f"(min_season={min_season}, max_season={max_season})."
+        )
+        return
+
     # Load tuned hyperparameters
     artifacts_dir = Path(settings.model_artifacts_dir)
-    elo_params = _load_json_params(artifacts_dir / "elo_best_params.json",
-                                   defaults={"k_factor": 24.0, "home_advantage": 50.0, "season_regression": 0.70})
-    xgb_params = _load_json_params(artifacts_dir / "xgb_best_params.json",
-                                   defaults={"max_depth": 3, "learning_rate": 0.1, "n_estimators": 200, "subsample": 0.8})
+    elo_params = _load_json_params(
+        artifacts_dir / "elo_best_params.json",
+        defaults={"k_factor": 24.0, "home_advantage": 50.0, "season_regression": 0.70},
+    )
+    xgb_params = _load_json_params(
+        artifacts_dir / "xgb_best_params.json",
+        defaults={"max_depth": 3, "learning_rate": 0.1, "n_estimators": 200, "subsample": 0.8},
+    )
 
     models = [
         BookmakerBaseline(),
@@ -97,6 +117,15 @@ def run(
         ),
         PoissonModel(),
     ]
+
+    # Ensemble of the four forecasting models, weighted from the single source
+    # of truth (Settings.ensemble_weights) so the benchmarked blend is the
+    # blend production ships. Components are fresh instances: BacktestRunner
+    # refits every model per fold, and sharing instances with the standalone
+    # entries above would mean each fold's fit silently reused the other's state.
+    ensemble = _build_ensemble(elo_params, xgb_params)
+    if ensemble is not None:
+        models.append(ensemble)
 
     runner = BacktestRunner(
         mode=mode,
@@ -128,14 +157,87 @@ def run(
     # Print per-season breakdown for the two best models
     fold_df = result.summary_df()
     if not fold_df.empty:
-        _fold_cols = ["fold_label", "model_name", "n_settled", "brier_score", "accuracy", "n_bets", "roi"]
+        _fold_cols = [
+            "fold_label",
+            "model_name",
+            "n_settled",
+            "brier_score",
+            "accuracy",
+            "n_bets",
+            "roi",
+        ]
         fold_display = [c for c in _fold_cols if c in fold_df.columns]
         # Show logistic and xgboost per-season
-        best_models = ["logistic_baseline", "xgboost", "elo_baseline"]
+        best_models = ["logistic_baseline", "xgboost", "elo_baseline", "ensemble"]
         fold_subset = fold_df[fold_df["model_name"].isin(best_models)][fold_display]
         if not fold_subset.empty:
             print("\n=== Per-season breakdown (selected models) ===")
             print(fold_subset.sort_values(["fold_label", "model_name"]).to_string(index=False))
+
+
+def _filter_seasons(df, min_season: int | None, max_season: int | None):
+    """Restrict the feature frame to a season range, logging what was dropped."""
+    if min_season is None and max_season is None:
+        return df
+    before = len(df)
+    if min_season is not None:
+        df = df[df["season"] >= min_season]
+    if max_season is not None:
+        df = df[df["season"] <= max_season]
+    seasons = sorted(int(s) for s in df["season"].unique())
+    span = f"{seasons[0]}-{seasons[-1]}" if seasons else "none"
+    logger.info(f"run_backtest: season filter kept {len(df)}/{before} rows (seasons {span})")
+    return df.reset_index(drop=True)
+
+
+def _build_ensemble(elo_params: dict, xgb_params: dict):
+    """
+    Build the production-weighted ensemble for evaluation.
+
+    Weights come from Settings.ensemble_weights. Any configured component with
+    no constructor here (e.g. bookmaker_baseline, which is the benchmark rather
+    than a component) is reported and skipped. Returns None if fewer than two
+    components remain, since a one-model 'ensemble' is just that model.
+    """
+    factories = {
+        "logistic_baseline": LogisticBaseline,
+        "xgboost": lambda: XGBoostModel(
+            max_depth=int(xgb_params["max_depth"]),
+            learning_rate=xgb_params["learning_rate"],
+            n_estimators=int(xgb_params["n_estimators"]),
+            subsample=xgb_params["subsample"],
+        ),
+        "poisson": PoissonModel,
+        "elo_baseline": lambda: EloBaseline(
+            k_factor=elo_params["k_factor"],
+            home_advantage=elo_params["home_advantage"],
+            season_regression=elo_params["season_regression"],
+        ),
+    }
+
+    components = []
+    for name, weight in settings.ensemble_weights.items():
+        factory = factories.get(name)
+        if factory is None:
+            logger.warning(
+                f"run_backtest: ensemble weight configured for {name!r} but that "
+                "model is not a backtestable component — skipping it in the ensemble row."
+            )
+            continue
+        components.append((factory(), weight))
+
+    if len(components) < 2:
+        logger.warning(
+            "run_backtest: fewer than 2 ensemble components configured — "
+            "skipping the ensemble row."
+        )
+        return None
+
+    logger.info(
+        "run_backtest: ensemble components "
+        f"{ {m.name: round(w, 3) for m, w in components} }"
+    )
+    return TrainableEnsemble(components)
 
 
 def _load_json_params(path: Path, defaults: dict) -> dict:
@@ -187,6 +289,14 @@ def _parse_args() -> argparse.Namespace:
         dest="max_kelly_fraction",
         help="Kelly fraction cap. Defaults to settings.max_kelly_fraction (0.05)."
     )
+    p.add_argument(
+        "--min-season", type=int, default=None, dest="min_season",
+        help="Drop seasons before this year (e.g. the first season with odds coverage)."
+    )
+    p.add_argument(
+        "--max-season", type=int, default=None, dest="max_season",
+        help="Drop seasons after this year (e.g. exclude an in-progress season)."
+    )
     return p.parse_args()
 
 
@@ -198,6 +308,8 @@ if __name__ == "__main__":
             min_train_seasons=args.min_train_seasons,
             edge_threshold=args.edge_threshold,
             max_kelly_fraction=args.max_kelly_fraction,
+            min_season=args.min_season,
+            max_season=args.max_season,
         )
     except Exception:
         logger.exception("run_backtest: unhandled error")
