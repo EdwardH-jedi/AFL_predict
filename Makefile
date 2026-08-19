@@ -1,10 +1,17 @@
-.PHONY: help install serve pipeline pipeline-cron test test-fast lint format migrate db-init build-features backtest train-models freshness-check daily-summary readiness today-summary notify clv fetch-weather fetch-player-stats
+# Every target assumes an activated virtualenv (see README "Setup"), where
+# `python` is the venv interpreter. Override for other setups, e.g.:
+#   make test PYTHON=.venv/bin/python
+PYTHON ?= python
+PIP    ?= $(PYTHON) -m pip
+
+.PHONY: help install demo serve pipeline pipeline-cron test test-fast lint format migrate db-init build-features backtest train-models freshness-check daily-summary readiness today-summary notify clv fetch-weather fetch-player-stats
 
 help:
 	@echo ""
 	@echo "AFL Predict — available commands"
 	@echo "---------------------------------"
 	@echo "  install          Install Python dependencies"
+	@echo "  demo             Run the credential-free portfolio demo (start here)"
 	@echo "  serve            Start FastAPI development server"
 	@echo "  pipeline         Run the full daily pipeline manually"
 	@echo "  ingest-afl       Fetch AFL fixtures/results (--season --round)"
@@ -26,70 +33,75 @@ help:
 	@echo ""
 
 install:
-	pip install -r requirements-dev.txt
+	$(PIP) install -r requirements-dev.txt
+
+# Credential-free portfolio demo. No .env, no database, no network, no API keys.
+# Trains the real models on bundled sample data and writes the dashboard payload.
+demo:
+	$(PYTHON) -m demo.run_demo
 
 serve:
-	uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+	$(PYTHON) -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
 pipeline:
-	python -m orchestration.daily_pipeline --triggered-by manual
+	$(PYTHON) -m orchestration.daily_pipeline --triggered-by manual
 
 pipeline-cron:
-	python -m orchestration.daily_pipeline --triggered-by cron
+	$(PYTHON) -m orchestration.daily_pipeline --triggered-by cron
 
 freshness-check:
-	python -m orchestration.jobs.check_data_freshness
+	$(PYTHON) -m orchestration.jobs.check_data_freshness
 
 daily-summary:
-	python -m orchestration.jobs.generate_daily_summary
+	$(PYTHON) -m orchestration.jobs.generate_daily_summary
 
 readiness:
-	python -m evaluation.live_readiness
+	$(PYTHON) -m evaluation.live_readiness
 
 today-summary:
-	@python -c "import json, pathlib, datetime; p=pathlib.Path('storage/daily_summaries')/f\"{datetime.date.today()}.json\"; print(json.dumps(json.loads(p.read_text()), indent=2) if p.exists() else 'No summary found for today. Run: make daily-summary')"
+	@$(PYTHON) -c "import json, pathlib, datetime; p=pathlib.Path('storage/daily_summaries')/f\"{datetime.date.today()}.json\"; print(json.dumps(json.loads(p.read_text()), indent=2) if p.exists() else 'No summary found for today. Run: make daily-summary')"
 
 ingest-afl:
-	python -m orchestration.jobs.ingest_afl $(ARGS)
+	$(PYTHON) -m orchestration.jobs.ingest_afl $(ARGS)
 
 ingest-odds:
-	python -m orchestration.jobs.ingest_tab_odds $(ARGS)
+	$(PYTHON) -m orchestration.jobs.ingest_tab_odds $(ARGS)
 
 build-features:
-	python -m orchestration.jobs.build_features $(ARGS)
+	$(PYTHON) -m orchestration.jobs.build_features $(ARGS)
 
 backtest:
-	python -m orchestration.jobs.run_backtest $(ARGS)
+	$(PYTHON) -m orchestration.jobs.run_backtest $(ARGS)
 
 train-models:
-	python -m orchestration.jobs.train_models $(ARGS)
+	$(PYTHON) -m orchestration.jobs.train_models $(ARGS)
 
 test:
-	pytest tests/ -v
+	$(PYTHON) -m pytest tests/ -v
 
 test-fast:
-	pytest tests/ -v -m "not slow"
+	$(PYTHON) -m pytest tests/ -v -m "not slow"
 
 lint:
-	ruff check .
+	$(PYTHON) -m ruff check .
 
 format:
-	ruff format .
+	$(PYTHON) -m ruff format .
 
 migrate:
-	alembic upgrade head
+	$(PYTHON) -m alembic upgrade head
 
 db-init:
-	python -c "from db.session import create_all_tables; create_all_tables(); print('Tables created.')"
+	$(PYTHON) -c "from db.session import create_all_tables; create_all_tables(); print('Tables created.')"
 
 notify:
-	python -m orchestration.jobs.notify_bets
+	$(PYTHON) -m orchestration.jobs.notify_bets
 
 fetch-weather:
-	python -m orchestration.jobs.fetch_weather $(ARGS)
+	$(PYTHON) -m orchestration.jobs.fetch_weather $(ARGS)
 
 fetch-player-stats:
-	python -m orchestration.jobs.fetch_player_stats $(ARGS)
+	$(PYTHON) -m orchestration.jobs.fetch_player_stats $(ARGS)
 
 clv:
-	python -c "from db.session import SessionLocal; from evaluation.clv_tracker import batch_clv, clv_summary, format_ci; db=SessionLocal(); r=batch_clv(db); print(clv_summary(r)); db.close()"
+	$(PYTHON) -c "from db.session import SessionLocal; from evaluation.clv_tracker import batch_clv, clv_summary, format_ci; db=SessionLocal(); r=batch_clv(db); print(clv_summary(r)); db.close()"
