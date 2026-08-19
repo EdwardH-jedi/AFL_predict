@@ -64,7 +64,17 @@ function TopBar() {
           <span>Workspace</span><span className="sep">/</span>
           <strong>Overview</strong>
         </div>
-        <span className="live-pill"><span className="live-dot"></span>Live · sync 12s ago</span>
+        {/* Static chip from the design handoff. It reports whether a payload was
+            overlaid, never a hard-coded "live" claim — see LiveStatusBanner for
+            the authoritative data-source state. */}
+        <span className="live-pill">
+          <span className="live-dot"></span>
+          {window.AFLLive && window.AFLLive.demoMode
+            ? "Sample data"
+            : window.AFLLive && (window.AFLLive.liveCardsApplied || []).length
+              ? "Live data"
+              : "Placeholder data"}
+        </span>
         <div className="spacer"></div>
         <div className="search">
           <window.I.Search size={12}/>

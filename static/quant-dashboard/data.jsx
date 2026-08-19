@@ -350,6 +350,12 @@ async function _loadPredictionsJson() {
     window.AFLLive = window.AFLLive || {};
     const perf = payload.performance || {};
     const summary = payload.summary || {};
+
+    // Demo payloads (written by `make demo`) replay completed matches from the
+    // bundled sample file. Flag that so the status banner can say so instead of
+    // claiming "LIVE DATA" over historical sample output.
+    window.AFLLive.demoMode = payload.demo === true;
+    window.AFLLive.demoNotice = payload.demo_notice || null;
     window.AFLLive.performance = {
       total_bets: perf.total_predictions ?? null,
       settled: perf.total_predictions ?? null,

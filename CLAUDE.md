@@ -16,13 +16,24 @@ models/              prediction + calibration models (logistic, XGBoost, Poisson
 evaluation/          metrics, live-readiness gate, CLV tracker
 orchestration/       daily pipeline jobs (ingest → features → train → recommend → settle → notify)
 backtesting/         walk-forward backtests, tuner scripts
-static/dashboard.html        legacy Chart.js dashboard (live)
-static/quant-dashboard/      Quant dashboard from the Claude Design handoff
+static/dashboard.html        legacy Chart.js dashboard (superseded — reference only)
+static/quant-dashboard/      CANONICAL dashboard (Claude Design handoff)
 frontend/            Vite/React/TS scaffold (Phase B placeholder, separate from quant-dashboard)
 tests/               pytest suite
-generate_predictions_json.py CSV → predictions.json converter (this file)
+demo/                credential-free portfolio demo (`make demo`)
+examples/            bundled sample data + example output artifacts
+docs/                architecture · methodology · results · operations · archive
+ops/                 machine-specific scheduling scripts and Korean runbooks
+generate_predictions_json.py CSV → predictions.json converter
 serve.py             stdlib HTTP server for standalone dashboard preview
 ```
+
+Root is intentionally minimal: `README.md`, `LICENSE`, `Makefile`,
+`requirements*.txt`, `.env.example`, `alembic.ini`, `pyproject.toml`, plus
+`serve.py` / `generate_predictions_json.py` and the source directories.
+Historical plans (PRDs, ACCURACY_PLAN, SKILLS, merge-readiness notes, the
+LLM/QLoRA narrative-generator design) live in `docs/archive/` and are **not**
+current specifications.
 
 ## Data flow: pipeline → predictions.json → dashboard
 
@@ -45,8 +56,9 @@ serve.py             stdlib HTTP server for standalone dashboard preview
 │ models/                                                                  │
 │   logistic_baseline, xgboost_model, poisson_model, elo_baseline,         │
 │   bookmaker_baseline, calibrated_model (Isotonic / Platt).               │
-│   Ensembled by config.settings.ensemble_weight_* in                       │
-│   orchestration/jobs/generate_recommendations.py.                         │
+│   Ensembled by Settings.ensemble_weights (config/settings.py) — the        │
+│   SINGLE source of truth, read by generate_recommendations.py AND the       │
+│   dashboard API. Never add a second weight table.                          │
 └──────────┬──────────────────────────────────────────────────────────────┘
            │
            ▼

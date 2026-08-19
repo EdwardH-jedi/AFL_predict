@@ -246,13 +246,25 @@ function LiveStatusBanner() {
   // Compose pills
   const pills = [];
 
-  // Live vs Mock
-  pills.push({
-    key: "mode",
-    label: isLive ? "LIVE DATA" : (s.loading ? "LOADING…" : "MOCK DATA"),
-    tone: isLive ? "ok" : (s.loading ? "neutral" : "warn"),
-    detail: isLive ? `overlay: ${applied.join(", ")}` : "demo dataset",
-  });
+  // Sample vs live vs mock.
+  // A demo payload must never be labelled "LIVE DATA": it is a replay of
+  // completed matches from examples/sample_matches.csv, and every panel this
+  // overlay does not populate is still showing the bundled placeholder dataset.
+  if (s.demoMode) {
+    pills.push({
+      key: "mode",
+      label: "SAMPLE DATA",
+      tone: "warn",
+      detail: "demo run — remaining panels are placeholder values, not results",
+    });
+  } else {
+    pills.push({
+      key: "mode",
+      label: isLive ? "LIVE DATA" : (s.loading ? "LOADING…" : "MOCK DATA"),
+      tone: isLive ? "ok" : (s.loading ? "neutral" : "warn"),
+      detail: isLive ? `overlay: ${applied.join(", ")}` : "placeholder dataset",
+    });
+  }
 
   // Freshness
   if (s.freshness) {
