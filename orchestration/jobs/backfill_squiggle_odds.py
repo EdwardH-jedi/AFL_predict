@@ -143,7 +143,7 @@ def _process_season(
             f"backfill_squiggle_odds: {season} — {n_fallback}/{len(tips_by_game)} games "
             "have NO bookmaker consensus and fall back to the Squiggle model "
             "(sourceid=1). Those are model estimates, not market prices; they are "
-            "tagged snapshot_type='historical_model_estimate' so they can be excluded."
+            "tagged snapshot_type='historical_model' so they can be excluded."
         )
 
     inserted = skipped = no_match = 0

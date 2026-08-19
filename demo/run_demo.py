@@ -79,7 +79,8 @@ def _split(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     The split is strictly temporal — every training match kicks off before every
     holdout match. Same leakage rule the real backtester enforces
-    (backtesting.splits.check_temporal_order), just with a single fold.
+    (backtesting.splits._assert_no_leakage, which raises rather than warns), just
+    with a single fold.
     """
     last_season = int(df["season"].max())
     regular = df[(df["season"] == last_season) & (~df["is_final"].astype(bool))]

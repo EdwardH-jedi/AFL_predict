@@ -115,7 +115,8 @@ Lower Brier and log loss are better. Brier 0.25 is a coin flip.
 | 2024 | 209 | **0.2092** | 0.2155 | 0.2203 | 0.2151 | 0.2500 | 0.2576 |
 | 2025 | 213 | **0.1763** | 0.1786 | 0.1815 | 0.2039 | 0.1765 | 0.2620 |
 
-Bookmaker consensus has the lowest Brier score in all seven seasons.
+Bookmaker consensus has the lowest Brier score in all seven seasons (and the
+lowest log loss in all seven).
 
 2020 is the COVID season: 160 matches, shortened quarters, heavily disrupted
 venues and travel. Treat it as an outlier rather than a data point.
@@ -124,10 +125,17 @@ venues and travel. Treat it as an outlier rather than a data point.
 
 ## What these numbers actually say
 
-**The market wins.** No model beats the bookmaker consensus on any of Brier, log
-loss, accuracy, or calibration error, in aggregate or in any individual season.
-The best model (logistic regression, 0.2056) sits about 3% worse than the
+**The market wins.** No model beats the bookmaker consensus on any of the four
+metrics in aggregate, and none beats it on Brier or log loss in *any* individual
+season. The best model (logistic regression, 0.2056) sits about 3% worse than the
 benchmark (0.1997).
+
+Individual models do edge it out on the two noisier metrics in single seasons —
+accuracy in 2020, 2023, 2024 and 2025 (highest: XGBoost 75.1% vs 73.7% in 2025),
+and ECE in 2020, 2022, 2023 and 2024 (Elo repeatedly). On ~200 matches per season
+those are coin-flips, not skill: accuracy discards the probability entirely, and
+ECE over a few bins is unstable at that sample size. Brier and log loss are the
+metrics that hold, and they never favour a model.
 
 That is the expected result, and reporting it plainly matters more than dressing
 it up. AFL head-to-head markets are liquid and efficient; a consensus of
@@ -147,31 +155,28 @@ ablation was run, so the size of any "lift from odds" is not established here.
 
 **The ensemble does not beat its best component.** Blending logistic (0.2056)
 with three weaker models yields 0.2081 — worse than logistic alone, better than
-everything else. Its ECE (0.0824) also sits between logistic's (0.0871) and
-Elo's (0.0762), so the blend does not buy calibration either; what it buys is
-variance reduction.
+everything else. Nor does it buy calibration: its ECE (0.0824) sits between
+logistic's (0.0871) and Elo's (0.0762). What it buys is variance reduction, which
+is a defensible reason to keep it but a modest one.
 
-The row is labelled *raw-component* deliberately. It uses the production weights
-from `Settings.ensemble_weights`, but not the production prediction function:
-`generate_recommendations` wraps logistic and XGBoost in `CalibratedModel`
-before blending, whereas the backtester fits them raw. Same blend, uncalibrated
-components.
+The weights are configuration (`Settings.ensemble_weights`), not a fitted result,
+and they have deliberately not been optimised against this evaluation — tuning
+weights on the folds you report would invalidate the report.
+
+The row is labelled *raw-component* deliberately. It uses the production weights,
+but not the production prediction function: `generate_recommendations` wraps
+logistic and XGBoost in `CalibratedModel` before blending, whereas the backtester
+fits them raw.
 
 **So the shipped ensemble's calibration is not measured here, in either
 direction.** Calibrating two of four components individually does not imply the
 weighted blend has lower ECE — averaging calibrated with uncalibrated
 probabilities can move calibration either way. A production-equivalent number
-means running the calibration flow inside each fold, which this run does not do. It buys variance reduction and pays accuracy for it. Its ECE
-(0.0782) is better than logistic's (0.0871), which is the defensible reason to
-keep it: better-calibrated probabilities matter more than raw Brier for a
-staking decision. The weights are configuration
-(`Settings.ensemble_weights`), not a fitted result, and they have not been
-optimised against this evaluation — deliberately, since tuning weights on the
-same folds you report would invalidate the report.
+means running the calibration flow inside each fold, which this run does not do.
 
 **XGBoost underperforms logistic regression.** With ~1,600 training rows and 29
 features, gradient boosting overfits where a linear model does not. Its ECE
-(0.1175) is the worst in the table. This is a sample-size problem, not a
+(0.1226) is the worst in the table by a wide margin. This is a sample-size problem, not a
 hyperparameter problem.
 
 **Poisson is barely a model.** In score mode its GLM regresses on an intercept
@@ -239,7 +244,7 @@ report.
 | Caveat | Detail |
 |---|---|
 | Odds are a consensus, not a book | Squiggle's Punters feed (`source=5`) gives one market-consensus implied probability per match, not a specific bookmaker's price. |
-| Odds source was audited, not assumed | `backfill_squiggle_odds.py` falls back to Squiggle's own *model* (`source=1`) when no Punters consensus exists — a model estimate, not a market price. Re-querying the API for 2017–2025 found **0 fallbacks out of 1,845 games**, so every record behind these results is genuine Punters consensus. The loader now tags any fallback `snapshot_type='historical_model_estimate'` and warns, so this is checkable rather than hand-audited next time. |
+| Odds source was audited, not assumed | `backfill_squiggle_odds.py` falls back to Squiggle's own *model* (`source=1`) when no Punters consensus exists — a model estimate, not a market price. Re-querying the API for 2017–2025 found **0 fallbacks out of 1,845 games**, so every record behind these results is genuine Punters consensus. The loader now tags any fallback `snapshot_type='historical_model'` and warns, so this is checkable rather than hand-audited next time. |
 | Odds have a synthetic timestamp | The feed carries no capture time. `backfill_squiggle_odds.py` stamps each snapshot 2 hours pre-match so it satisfies the `snapshot_time < match_time` rule. The true capture time is unknown and probably closer to kickoff, which makes the benchmark *stronger* than a genuine morning line. |
 | Zero overround | See caveat 1 under staking. |
 | No weather | No historical weather was collected for these seasons. Weather features exist in the schema and are null throughout. Their contribution to these results is exactly zero. |

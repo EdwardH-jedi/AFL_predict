@@ -308,7 +308,7 @@ make build-features ARGS="--season 2024"
 make train-models
 
 # 백테스트
-make backtest ARGS="--mode walk_forward --min-train-seasons 3"
+make backtest ARGS="--mode expanding --min-train-seasons 3"
 ```
 
 ---

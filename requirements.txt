@@ -15,8 +15,9 @@
 #   pip install -r requirements.txt
 #
 # GPU note (RTX 5080):
-#   xgboost>=2.0 auto-detects CUDA if CUDA Toolkit is installed.
-#   No extra GPU package needed -- falls back to CPU if CUDA absent.
+#   Training currently runs on CPU. models/xgboost_model.py does not set
+#   device="cuda", and XGBoost 2.x does not select a GPU implicitly.
+#   No extra package is needed to enable it -- just that argument.
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -59,7 +60,9 @@ pyarrow>=14.0.0                     # parquet read/write; any version >=14 works
 # Machine learning
 # ---------------------------------------------------------------------------
 scikit-learn>=1.4.0,<2.0.0          # LogisticRegression, calibration, metrics
-xgboost>=2.0.0,<4.0.0               # XGBoostModel; auto-uses CUDA on RTX 5080
+xgboost>=2.0.0,<4.0.0               # XGBoostModel. CPU-only as wired: the model
+                                    # does not pass device="cuda", and XGBoost 2.x
+                                    # does not pick a GPU by itself.
 statsmodels>=0.14.0,<1.0.0          # PoissonModel (GLM)
 scipy>=1.12.0,<2.0.0                # ensemble weight optimisation (L-BFGS-B)
 joblib>=1.3.0,<2.0.0                # model artifact save/load

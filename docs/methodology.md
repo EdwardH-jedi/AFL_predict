@@ -95,7 +95,10 @@ generalises better than gradient boosting — see [`results.md`](results.md).
 ### XGBoost
 
 Gradient-boosted trees over the same features, with early stopping and SHAP
-importances available. Auto-detects CUDA. Overfits on this sample size; kept
+importances available. CPU-only as wired: `XGBClassifier` is constructed without
+a `device` argument, and XGBoost 2.x does not select a GPU on its own, so the
+"auto-detects CUDA" note elsewhere in this repo's history is wrong. Using a GPU
+would mean passing `device="cuda"`. Overfits on this sample size; kept
 because it contributes something different to the blend, not because it wins.
 
 ### Poisson
@@ -130,8 +133,12 @@ season  N          evaluate
 The base model is **not** refit on seasons 1..N-1 afterwards. An isotonic
 calibrator is tied to the output distribution of one specific fitted model;
 refitting the base shifts that distribution and leaves the calibrator mapping
-stale probabilities. That was measured, not assumed — ECE ballooned to 0.31
-under the refit flow. The cost is one season less training data for the base
+stale probabilities. That was observed, not assumed: ECE reached ~0.31 under the
+refit flow (recorded in `orchestration/jobs/train_models.py`'s docstring at the
+time the flow was changed). That figure comes from the *training* job's own
+single-split evaluation, not from the walk-forward run in
+[`results.md`](results.md) — which does not measure the calibrated flow at all,
+and says so. The cost is one season less training data for the base
 model. The benefit is probabilities that mean what they say.
 
 Quality is reported as **ECE** (expected calibration error) alongside Brier and

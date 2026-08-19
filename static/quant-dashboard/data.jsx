@@ -310,12 +310,17 @@ function _gamesToPicks(games) {
       : (g.home_win_prob ?? 0.5) >= 0.5;
     const pick = pickIsHome ? home : away;
     const pred = pickIsHome ? (g.home_win_prob ?? 0.5) : (1 - (g.home_win_prob ?? 0.5));
-    // Price the side actually being shown. `tab_odds` is the HOME price by
-    // definition, so using it for an away pick produced a wrong implied
-    // probability and a wrong edge. Prefer the recommended side's own price,
-    // then the per-side price, and only fall back to tab_odds.
+    // Price the side this row is about — the model's pick. `tab_odds` is the
+    // HOME price by definition, so using it for an away pick gave a wrong
+    // implied probability and a wrong edge.
+    //
+    // Deliberately NOT g.bet_odds: that is the price of the *recommended bet*,
+    // which can be the opposite team from the pick (the model can favour the
+    // away side while the value sits on the home side). Pairing this row's
+    // `pred` with the other side's price is what produced the inflated edges.
+    // Falls back to tab_odds for legacy payloads without per-side prices.
     const sideOdds = pickIsHome ? g.home_odds : g.away_odds;
-    const odds = Number(g.bet_odds ?? sideOdds ?? g.tab_odds) || 0;
+    const odds = Number(sideOdds ?? g.tab_odds) || 0;
     const impl = odds > 0 ? 1 / odds : 0;
     const edge = (pred - impl) * 100;
     const conf = _CONFIDENCE_TO_PIPS[String(g.confidence || "").toUpperCase()] ?? 3;

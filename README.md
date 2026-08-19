@@ -139,8 +139,13 @@ matches**, verified 2026-08-19. Full methodology and caveats:
 same 1,413 matches — which is also exactly where Poisson lands.*
 
 **No model beats the market.** The best model lands about 3% worse than the
-bookmaker consensus on Brier — in aggregate, in every individual season, and on
-log loss, accuracy and calibration error too.
+bookmaker consensus on Brier. The market wins all four metrics in aggregate, and
+wins Brier and log loss in every individual season.
+
+Individual models do edge it out on accuracy or calibration error in single
+seasons, but those are the noisy metrics — on ~200 matches, accuracy throws the
+probability away and ECE over a few bins is unstable. `docs/results.md` lists
+exactly which seasons and why they are not evidence of skill.
 
 Hyperparameters come from each model class's own defaults, not from the tuners:
 the tuners search the same folds these numbers are measured on, so their output
