@@ -17,6 +17,7 @@ for loading into any analysis tool.
 from __future__ import annotations
 
 import json
+import math
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -26,6 +27,22 @@ import pandas as pd
 from loguru import logger
 
 from backtesting.bootstrap import BootstrapCI, bootstrap_metrics, format_ci
+
+
+def _json_safe(value):
+    """Recursively replace non-finite floats with None so output is valid JSON.
+
+    Metrics are NaN whenever a fold produced no settled matches or no bets (see
+    backtesting.metrics), and `float("nan")` has no JSON representation. null is
+    the honest encoding of "not computed".
+    """
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
 
 
 @dataclass
@@ -94,7 +111,10 @@ class BacktestResult:
         filename = f"backtest_{self.run_id[:8]}_{ts}.json"
         path = output_dir / filename
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, indent=2, default=str)
+            # allow_nan=False: Python's default emits bare NaN/Infinity, which is
+            # not valid JSON and is rejected by strict parsers. _json_safe maps
+            # every non-finite metric to null first, so this never raises.
+            json.dump(_json_safe(self.to_dict()), f, indent=2, default=str, allow_nan=False)
         logger.info(f"BacktestResult saved to {path}")
         return path
 

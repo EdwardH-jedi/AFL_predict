@@ -119,7 +119,13 @@ def _process_season(
         logger.warning(f"backfill_squiggle_odds: no tips returned for {season}")
         return 0, 0, 0
 
-    # Pick Punters where available, fall back to Squiggle model
+    # Pick Punters where available, fall back to Squiggle model.
+    #
+    # These two sources are NOT equivalent: Punters is a bookmaker consensus (a
+    # market price), while source 1 is Squiggle's own statistical model (not a
+    # market price at all). Silently storing both under one label would make the
+    # bookmaker baseline partly a comparison against another model. The source id
+    # is therefore persisted per snapshot and the fallback count is logged.
     tips_by_game: dict[int, dict] = {}
     for tip in tips:
         gid = tip["gameid"]
@@ -128,6 +134,17 @@ def _process_season(
             tips_by_game[gid] = tip  # Punters wins
         elif src == _SQUIGGLE_SOURCE_ID and gid not in tips_by_game:
             tips_by_game[gid] = tip  # Squiggle as fallback
+
+    n_fallback = sum(
+        1 for t in tips_by_game.values() if t.get("sourceid") != _PUNTERS_SOURCE_ID
+    )
+    if n_fallback:
+        logger.warning(
+            f"backfill_squiggle_odds: {season} — {n_fallback}/{len(tips_by_game)} games "
+            "have NO bookmaker consensus and fall back to the Squiggle model "
+            "(sourceid=1). Those are model estimates, not market prices; they are "
+            "tagged snapshot_type='historical_model_estimate' so they can be excluded."
+        )
 
     inserted = skipped = no_match = 0
 
@@ -155,7 +172,7 @@ def _process_season(
             no_match += 1
             continue
 
-        snapshot = _build_snapshot(match, float(hconf))
+        snapshot = _build_snapshot(match, float(hconf), source_id=tip.get("sourceid"))
         if dry_run:
             logger.info(
                 f"[DRY RUN] match_id={match.id} {season} R{tip.get('round')} "
@@ -173,18 +190,25 @@ def _process_season(
 
     logger.info(
         f"backfill_squiggle_odds: {season} — "
-        f"{inserted} inserted, {skipped} skipped, {no_match} no DB match "
+        f"{inserted} inserted, {skipped} skipped, {no_match} no DB match, "
+        f"{n_fallback} model-estimate fallback "
         f"(from {len(tips_by_game)} unique games)"
     )
     return inserted, skipped, no_match
 
 
-def _build_snapshot(match: Match, hconfidence: float) -> OddsSnapshot:
+def _build_snapshot(match: Match, hconfidence: float, source_id: int | None = None) -> OddsSnapshot:
     """
     Build an OddsSnapshot from a Squiggle Punters hconfidence value.
 
-    hconfidence is the home team win % as implied by bookmaker consensus.
-    It is already overround-normalised (home + away = 100%).
+    hconfidence is the home team win % as implied by bookmaker consensus
+    (source 5, Punters). It is already overround-normalised (home + away = 100%),
+    which means these prices carry NO bookmaker margin — see docs/results.md
+    before treating any simulated return from them as achievable.
+
+    source_id records which Squiggle source the value came from. Anything other
+    than Punters is a model estimate rather than a market price and is tagged
+    distinctly so downstream analysis can exclude it.
     """
     home_prob = hconfidence / 100.0
     away_prob = 1.0 - home_prob
@@ -209,7 +233,11 @@ def _build_snapshot(match: Match, hconfidence: float) -> OddsSnapshot:
         away_implied_prob=round(away_prob, 6),
         overround=1.0,  # Punters normalises to 100%
         snapshot_time=snapshot_time,
-        snapshot_type="historical_consensus",
+        snapshot_type=(
+            "historical_consensus"
+            if source_id == _PUNTERS_SOURCE_ID
+            else "historical_model_estimate"
+        ),
     )
 
 

@@ -264,6 +264,14 @@ def _build_payload(
                 "bet_amount": bet["stake"] if bet else 0.0,
                 "bet_side": bet["side"] if bet else None,
                 "edge": bet["edge"] if bet else None,
+                # Both sides of the market, plus the price of the side actually
+                # recommended. Reporting bm_home_odds as "the" price mislabelled
+                # every away recommendation with the home number.
+                "home_odds": round(float(row["bm_home_odds"]), 3),
+                "away_odds": round(float(row["bm_away_odds"]), 3),
+                "bet_odds": bet["odds"] if bet else None,
+                # Retained for the dashboard's predictions.json contract, which
+                # expects a single `tab_odds`; it is the home price by definition.
                 "tab_odds": round(float(row["bm_home_odds"]), 3),
                 **{
                     k: (round(float(s.loc[mid]), 4) if mid in s.index else None)
@@ -339,7 +347,7 @@ def _report(payload: dict, train_rows: int, wrote_example: bool = False) -> None
     for g in p["games"]:
         match = f"{g['home_team']} v {g['away_team']}"
         bet = (
-            f"${g['bet_amount']:.2f} on {g['bet_side']} @ {g['tab_odds']}"
+            f"${g['bet_amount']:.2f} on {g['bet_side']} @ {g['bet_odds']}"
             if g["bet_recommended"]
             else "no bet (edge below threshold)"
         )

@@ -12,28 +12,53 @@ two runs of the same checkout must not disagree).
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 
 import pytest
 
 from demo import run_demo
 
 
+@contextmanager
+def _redirected_outputs(out_dir):
+    """Point every demo output path at a temp directory, then restore.
+
+    All THREE module-level paths must be redirected. Missing one lets the test
+    suite rewrite a tracked file under examples/, which dirties the working tree
+    and fails CI's clean-tree gate — the exact bug this helper exists to prevent.
+    """
+    paths = {
+        "predictions": out_dir / "predictions.json",
+        "summary": out_dir / "summary.json",
+        "example": out_dir / "example_predictions.json",
+    }
+    original = (
+        run_demo.PREDICTIONS_JSON,
+        run_demo.SUMMARY_JSON,
+        run_demo.EXAMPLE_PREDICTIONS_JSON,
+    )
+    run_demo.PREDICTIONS_JSON = paths["predictions"]
+    run_demo.SUMMARY_JSON = paths["summary"]
+    run_demo.EXAMPLE_PREDICTIONS_JSON = paths["example"]
+    try:
+        yield paths
+    finally:
+        (
+            run_demo.PREDICTIONS_JSON,
+            run_demo.SUMMARY_JSON,
+            run_demo.EXAMPLE_PREDICTIONS_JSON,
+        ) = original
+
+
 @pytest.fixture(scope="module")
 def payload(tmp_path_factory) -> dict:
-    """Run the demo once, redirecting its outputs into a temp directory."""
+    """Run the demo once, redirecting every output into a temp directory."""
     out = tmp_path_factory.mktemp("demo")
-    predictions = out / "predictions.json"
-    summary = out / "summary.json"
-
-    original = (run_demo.PREDICTIONS_JSON, run_demo.SUMMARY_JSON)
-    run_demo.PREDICTIONS_JSON, run_demo.SUMMARY_JSON = predictions, summary
-    try:
+    with _redirected_outputs(out) as paths:
         assert run_demo.main(["--json-only", "--write-example"]) == 0
-        data = json.loads(predictions.read_text())
-        data["_summary_artifact"] = json.loads(summary.read_text())
-    finally:
-        run_demo.PREDICTIONS_JSON, run_demo.SUMMARY_JSON = original
-
+        data = json.loads(paths["predictions"].read_text())
+        data["_summary_artifact"] = json.loads(paths["summary"].read_text())
+        data["_example_predictions"] = json.loads(paths["example"].read_text())
     return data
 
 
@@ -141,17 +166,12 @@ def test_holdout_split_is_strictly_temporal():
 
 def test_demo_is_deterministic(payload, tmp_path):
     """Same checkout, same numbers — a portfolio artifact cannot drift per run."""
-    predictions = tmp_path / "again.json"
-    summary = tmp_path / "again_summary.json"
-    original = (run_demo.PREDICTIONS_JSON, run_demo.SUMMARY_JSON)
-    run_demo.PREDICTIONS_JSON, run_demo.SUMMARY_JSON = predictions, summary
-    try:
+    with _redirected_outputs(tmp_path) as paths:
         run_demo.main(["--json-only", "--write-example"])
-        second = json.loads(predictions.read_text())
-    finally:
-        run_demo.PREDICTIONS_JSON, run_demo.SUMMARY_JSON = original
+        second = json.loads(paths["predictions"].read_text())
 
     # generated_at is a wall-clock timestamp and is expected to differ.
-    first = {k: v for k, v in payload.items() if k not in ("generated_at", "_summary_artifact")}
+    injected = ("generated_at", "_summary_artifact", "_example_predictions")
+    first = {k: v for k, v in payload.items() if k not in injected}
     second = {k: v for k, v in second.items() if k != "generated_at"}
     assert first == second

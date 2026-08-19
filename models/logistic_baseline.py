@@ -78,8 +78,10 @@ class LogisticBaseline(BaseModel):
     """
     Logistic regression win probability model.
 
-    Input features are standardised. Missing values are dropped during fit
-    and imputed to 0.5 during prediction (no-information prior for probs).
+    Input features are median-imputed then standardised, both inside a fitted
+    sklearn Pipeline, so training and prediction impute with the same medians.
+    Columns that are entirely null are dropped up front, since median imputation
+    has nothing to fill them from. Individual missing values do not drop a row.
     """
 
     name = "logistic_baseline"
@@ -96,7 +98,9 @@ class LogisticBaseline(BaseModel):
 
         Args:
             X: Feature DataFrame — must contain at least some of FEATURE_COLS.
-               Rows with any NaN in the selected features are dropped.
+               Columns that are entirely null are dropped; remaining missing
+               values are median-imputed (medians learned at fit time). Rows are
+               NOT dropped for individual missing features.
             y: Binary target (1 = home win, 0 = away win).
         """
         available = [col for col in FEATURE_COLS if col in X.columns]

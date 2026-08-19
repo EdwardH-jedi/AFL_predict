@@ -264,7 +264,20 @@ class PlayerCollector:
         """
         Compute availability_index for each (match, team) in this season.
 
-        Algorithm:
+        NOT IMPLEMENTED — reads as a constant. The intended algorithm is
+        described below, but the historical path emits availability_index = 1.0
+        and key_players_absent = 0 for every row (see the comment at the
+        assignment), because retrospective lineups only list players who
+        actually played: there is no record of who was unavailable, so the
+        expected-vs-available comparison has no denominator to compute.
+
+        Consequence: `*_availability_index` and `*_key_players_absent` are
+        constant across the whole dataset and contribute nothing to any model.
+        This is stated in docs/results.md rather than left for a reader to
+        discover. Making it real needs a pre-match team-sheet source
+        (fetch_player_stats on Thursdays), not a change here.
+
+        Intended algorithm:
           1. For each match, look up who played.
           2. For each team, rank players by rolling 5-game contribution score
              (disposals + goals*3) computed from PRIOR matches only (no leakage).

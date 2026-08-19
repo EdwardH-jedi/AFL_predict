@@ -28,7 +28,7 @@ which parts of this dashboard are data and which are placeholder.*
   head-to-head, venue, rest, interstate travel, weather, market prices — where
   every value is provably computable before kickoff
 - **Trains five probabilistic models** — Elo, logistic regression, XGBoost,
-  Poisson score distribution, and a bookmaker-consensus benchmark
+  a Poisson score-distribution baseline, and a bookmaker-consensus benchmark
 - **Calibrates** forecasts with out-of-sample isotonic regression, because stake
   size depends on the probability being right, not just the ranking
 - **Ensembles** them under a single authoritative weight configuration
@@ -92,14 +92,15 @@ Details in [`docs/architecture.md`](docs/architecture.md).
 | ML | scikit-learn, XGBoost, statsmodels, SciPy, SHAP |
 | HTTP | httpx, requests, tenacity, BeautifulSoup |
 | Frontend | React (in-browser JSX, no build step) · Vite + TypeScript for the secondary app |
+| Quality | pytest, ruff, mypy, GitHub Actions |
+| Ops | Discord webhooks, cron / Windows Task Scheduler, loguru |
 
 **Which UI is canonical:** `static/quant-dashboard/` — the one screenshotted
 above. It needs no build step and is what `make serve` and `python serve.py`
 present. `frontend/` is a secondary Vite/TypeScript app covering the same
 endpoints; `static/dashboard.html` is a superseded single-file Chart.js
 dashboard kept only for reference. Start with the quant dashboard.
-| Quality | pytest, ruff, mypy, GitHub Actions |
-| Ops | Discord webhooks, cron / Windows Task Scheduler, loguru |
+
 
 ---
 
@@ -111,7 +112,7 @@ dashboard kept only for reference. Start with the quant dashboard.
 | **Elo** | Ratings with home advantage and between-season regression | Low-variance stabiliser. Stateless at inference. |
 | **Logistic regression** | L2-regularised over 29 features | Strongest single model here. Linear generalises better than trees at this sample size. |
 | **XGBoost** | Gradient-boosted trees, early stopping, SHAP | Adds a different error profile to the blend; overfits alone. |
-| **Poisson** | Home/away scoring rates → score-difference distribution | Produces a full score distribution, not just a win probability. |
+| **Poisson** | Home/away scoring rates → score-difference distribution | Currently conditioned only on an intercept and finals status, so it predicts the same probability for every regular-season match — a global baseline, not a match-specific model. |
 | **Ensemble** | Weighted average, renormalised | Weights from `Settings.ensemble_weights` — one authoritative source, read by both the recommendation job and the API. |
 
 Full detail — feature-by-feature, calibration flow, leakage argument — in
@@ -129,7 +130,7 @@ matches**, verified 2026-08-19. Full methodology and caveats:
 |---|---|---|---|---|
 | **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | 0.0678 |
 | Logistic regression | 0.2056 | 0.5961 | 67.7% | 0.0871 |
-| Ensemble (production blend) | 0.2085 | 0.6042 | 67.6% | 0.0782 |
+| Ensemble (raw-component blend) | 0.2085 | 0.6042 | 67.6% | 0.0782 |
 | Elo | 0.2225 | 0.6343 | 63.1% | **0.0668** |
 | XGBoost | 0.2284 | 0.6693 | 64.3% | 0.1175 |
 | Poisson | 0.2558 | 0.7104 | 56.8% | 0.0926 |

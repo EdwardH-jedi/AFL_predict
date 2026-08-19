@@ -200,6 +200,10 @@ def _build_ensemble(elo_params: dict, xgb_params: dict):
     components remain, since a one-model 'ensemble' is just that model.
     """
     factories = {
+        # Present so a deliberately non-zero ENSEMBLE_WEIGHT_BOOKMAKER_BASELINE is
+        # actually evaluated. Production iterates every configured component, so
+        # omitting it here would silently benchmark a different blend than ships.
+        "bookmaker_baseline": BookmakerBaseline,
         "logistic_baseline": LogisticBaseline,
         "xgboost": lambda: XGBoostModel(
             max_depth=int(xgb_params["max_depth"]),

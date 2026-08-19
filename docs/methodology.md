@@ -97,9 +97,16 @@ because it contributes something different to the blend, not because it wins.
 ### Poisson
 
 Models home and away scoring rates as Poisson processes (statsmodels GLM), then
-integrates the score-difference distribution to a win probability. Its appeal is
-that it produces a full score distribution rather than a single number; its
-weakness is that it ignores the market signal the other models use directly.
+integrates the score-difference distribution to a win probability.
+
+**In its current wiring this is a global baseline, not a match-specific model.**
+`_fit_score_mode` regresses score on an intercept and `is_final` only — no team
+identity, no form, no market. So every regular-season match receives the same
+pair of scoring rates and the same win probability, and its accuracy comes out
+identical to always picking the home team. The class supports conditioning on
+richer covariates; nothing currently supplies them. Read its row in
+[`results.md`](results.md) as a floor, and do not read the ensemble's Poisson
+component as contributing match-level information.
 
 ### Calibration
 
