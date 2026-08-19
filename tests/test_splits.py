@@ -8,7 +8,7 @@ No network, no database.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 import pytest
@@ -20,7 +20,6 @@ from backtesting.splits import (
     expanding_window_splits,
     rolling_window_splits,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -39,7 +38,7 @@ def _make_df(season_rows: dict[int, list[str]]) -> pd.DataFrame:
             rows.append({
                 "match_id": match_id,
                 "season": season,
-                "match_time": datetime.fromisoformat(d).replace(tzinfo=timezone.utc),
+                "match_time": datetime.fromisoformat(d).replace(tzinfo=UTC),
                 "home_win": 1,
             })
             match_id += 1
@@ -165,8 +164,12 @@ class TestLeakageDetection:
             _assert_no_leakage(train, test, "2022")
 
     def test_empty_timestamps_skips_check(self):
-        train = pd.DataFrame({"match_id": [1], "season": [2021], "match_time": [None], "home_win": [1]})
-        test = pd.DataFrame({"match_id": [2], "season": [2022], "match_time": [None], "home_win": [1]})
+        train = pd.DataFrame(
+            {"match_id": [1], "season": [2021], "match_time": [None], "home_win": [1]}
+        )
+        test = pd.DataFrame(
+            {"match_id": [2], "season": [2022], "match_time": [None], "home_win": [1]}
+        )
         _assert_no_leakage(train, test, "2022")  # should not raise
 
 

@@ -16,9 +16,8 @@ Output: storage/daily_summaries/roles/quant_reviewer/{YYYY-MM-DD}.json
 from __future__ import annotations
 
 import json
-import math
 import time
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -57,7 +56,7 @@ def run() -> None:
         readiness_gate = _clv_first_gate(clv_section, brier_section)
 
     report = {
-        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "generated_at": datetime.now(tz=UTC).isoformat(),
         "clv": clv_section,
         "per_phase_brier": brier_section,
         "trend": trend,
@@ -242,7 +241,9 @@ def _verdict(report: dict[str, Any]) -> tuple[str, list[str]]:
 
     clv = report.get("clv", {})
     if clv.get("available") and (clv.get("avg_clv_pct") or 0) < 0:
-        warnings.append("CLV is negative over the trailing window — regime shift or broken feature.")
+        warnings.append(
+            "CLV is negative over the trailing window — regime shift or broken feature."
+        )
 
     trend = report.get("trend", {})
     if trend.get("verdict") == "regressing":

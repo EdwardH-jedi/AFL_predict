@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +47,7 @@ def run() -> None:
         history = _recent_runs(db, limit=20)
 
     report = {
-        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "generated_at": datetime.now(tz=UTC).isoformat(),
         "models": latest_per_model,
         "recent_runs": history,
         "leaderboard": _leaderboard(latest_per_model),
@@ -79,10 +79,14 @@ def _latest_per_model(db: Session) -> list[dict[str, Any]]:
     for r in all_runs:
         seen.setdefault(r.model_name, r)
 
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     out = []
     for name, run in seen.items():
-        created = run.created_at.replace(tzinfo=timezone.utc) if run.created_at and run.created_at.tzinfo is None else run.created_at
+        created = (
+            run.created_at.replace(tzinfo=UTC)
+            if run.created_at and run.created_at.tzinfo is None
+            else run.created_at
+        )
         age_days = (now - created).total_seconds() / 86400 if created else None
         out.append({
             "model_name": name,
@@ -159,7 +163,9 @@ def _verdict(models: list[dict[str, Any]]) -> tuple[str, list[str]]:
 
     stale = [m["model_name"] for m in models if m.get("stale")]
     if stale:
-        warnings.append(f"Stale models (>{_RETRAIN_DUE_DAYS} days): {', '.join(stale)}. Retrain due.")
+        warnings.append(
+            f"Stale models (>{_RETRAIN_DUE_DAYS} days): {', '.join(stale)}. Retrain due."
+        )
 
     required = {"logistic_baseline", "xgboost", "ensemble"}
     present = {m["model_name"] for m in models}

@@ -12,13 +12,13 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import db.models  # noqa: F401 — registers all models against Base.metadata
 from config.settings import get_settings
 
 # ---------------------------------------------------------------------------
 # Import all ORM models so Alembic can diff against Base.metadata
 # ---------------------------------------------------------------------------
 from db.base import Base  # noqa: F401
-import db.models  # noqa: F401 — registers all models against Base.metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

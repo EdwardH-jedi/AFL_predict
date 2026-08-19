@@ -49,7 +49,9 @@ class WeatherSnapshot(Base):
     weather_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Derived: is it raining? (precipitation > 0.5mm or weather_code in rain range)
-    is_raining: Mapped[bool | None] = mapped_column(Integer, nullable=True)  # stored as int for SQLite
+    is_raining: Mapped[bool | None] = mapped_column(
+        Integer, nullable=True
+    )  # stored as int for SQLite
     # High wind flag: wind_speed > 40 km/h significantly affects AFL scoring
     is_high_wind: Mapped[bool | None] = mapped_column(Integer, nullable=True)
     # Extreme heat flag: >35C

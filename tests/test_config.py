@@ -4,9 +4,7 @@ tests/test_config.py
 Tests for config/settings.py loading and validation.
 """
 
-import os
 
-import pytest
 
 
 def test_settings_loads():

@@ -12,8 +12,12 @@ class Prediction(Base):
     __tablename__ = "predictions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    match_id: Mapped[int] = mapped_column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
-    model_run_id: Mapped[int] = mapped_column(Integer, ForeignKey("model_runs.id"), nullable=False, index=True)
+    match_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("matches.id"), nullable=False, index=True
+    )
+    model_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("model_runs.id"), nullable=False, index=True
+    )
 
     # Model's predicted win probability for the home team
     home_win_prob: Mapped[float] = mapped_column(Float, nullable=False)

@@ -12,7 +12,9 @@ class OddsSnapshot(Base):
     __tablename__ = "odds_snapshots"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    match_id: Mapped[int] = mapped_column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
+    match_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("matches.id"), nullable=False, index=True
+    )
 
     # Source identifier — TAB or other bookmaker
     bookmaker: Mapped[str] = mapped_column(String(50), nullable=False, default="TAB")

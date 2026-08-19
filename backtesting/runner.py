@@ -29,8 +29,6 @@ Assumptions logged at run time:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pandas as pd
 from loguru import logger
 
@@ -38,7 +36,6 @@ from backtesting.artifacts import BacktestResult
 from backtesting.metrics import WindowMetrics, aggregate_metrics, compute_metrics
 from backtesting.simulation import settle_bets, simulate_recommendations
 from backtesting.splits import (
-    LeakageError,
     check_temporal_order,
     expanding_window_splits,
     rolling_window_splits,
@@ -230,7 +227,8 @@ class BacktestRunner:
 # ---------------------------------------------------------------------------
 
 _ASSUMPTIONS: list[str] = [
-    "All feature values are pre-match (EloExtractor, FormExtractor, BookmakerExtractor enforce this).",
+    "All feature values are pre-match "
+    "(EloExtractor, FormExtractor, BookmakerExtractor enforce this).",
     "Bookmaker odds features use snapshot_time < match_time.",
     "No draws are included in the target variable — home_win=None for draws.",
     "Decimal odds are fixed at the pre-match snapshot value (no in-play movement modelled).",

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from db.models.model_runs import ModelRun
 
@@ -15,7 +15,7 @@ def _completed_run(model_name: str, **kwargs) -> ModelRun:
     defaults = {
         "model_version": "0.1",
         "status": "completed",
-        "completed_at": datetime.now(tz=timezone.utc),
+        "completed_at": datetime.now(tz=UTC),
         "brier_score": 0.2,
     }
     defaults.update(kwargs)
@@ -71,7 +71,9 @@ def test_load_best_model_fallback_skips_stale_best_brier_run(db_session, monkeyp
     assert model.name == "elo_baseline"
 
 
-def test_try_build_ensemble_uses_first_loaded_component_run_when_no_xgb_or_logistic(db_session, monkeypatch):
+def test_try_build_ensemble_uses_first_loaded_component_run_when_no_xgb_or_logistic(
+    db_session, monkeypatch
+):
     from orchestration.jobs import generate_recommendations as recs
 
     db_session.query(ModelRun).delete()

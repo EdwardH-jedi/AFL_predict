@@ -21,7 +21,7 @@ CLI usage:
 import argparse
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from loguru import logger
@@ -62,7 +62,7 @@ def run(season: int | None = None, write_db: bool = True) -> None:
             if df.empty:
                 logger.warning("build_features: empty feature DataFrame — skipping save.")
                 run_record.status = "completed"
-                run_record.completed_at = datetime.now(tz=timezone.utc)
+                run_record.completed_at = datetime.now(tz=UTC)
                 run_record.duration_seconds = round(time.monotonic() - start, 2)
                 run_record.records_processed = 0
                 return
@@ -81,7 +81,7 @@ def run(season: int | None = None, write_db: bool = True) -> None:
 
             duration = time.monotonic() - start
             run_record.status = "completed"
-            run_record.completed_at = datetime.now(tz=timezone.utc)
+            run_record.completed_at = datetime.now(tz=UTC)
             run_record.duration_seconds = round(duration, 2)
             run_record.records_processed = len(df)
             logger.info(

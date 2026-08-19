@@ -14,12 +14,11 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from config.settings import get_settings
@@ -44,7 +43,7 @@ def run() -> None:
 
     with db_session() as db:
         report = {
-            "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+            "generated_at": datetime.now(tz=UTC).isoformat(),
             "odds": _odds_coverage(db),
             "player_lineups": _player_lineup_coverage(db),
             "weather": _weather_coverage(db),
@@ -170,7 +169,9 @@ def _verdict(report: dict[str, Any]) -> tuple[str, list[str]]:
     for src in ("player_lineups", "weather"):
         section = report.get(src, {})
         if section.get("available") and (section.get("coverage_pct") or 0) < 20:
-            warnings.append(f"{src} coverage is {section['coverage_pct']:.1f}% — effectively unused.")
+            warnings.append(
+                f"{src} coverage is {section['coverage_pct']:.1f}% — effectively unused."
+            )
 
     if not warnings:
         return "ok", warnings

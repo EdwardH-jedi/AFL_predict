@@ -17,7 +17,9 @@ class Team(Base):
     # State/city for display purposes
     state: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # External reference ID from data source (e.g. Squiggle team ID)
-    external_id: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True, index=True)
+    external_id: Mapped[str | None] = mapped_column(
+        String(50), unique=True, nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     # Relationships (matches where this team is home or away)

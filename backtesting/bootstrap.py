@@ -28,11 +28,10 @@ from __future__ import annotations
 
 import math
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import numpy as np
-
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -65,7 +64,11 @@ class BootstrapCI:
         True if the CI for `metric` is entirely above zero.
         metric: 'roi' | 'hit_rate' | 'sharpe'
         """
-        low_map = {"roi": self.roi_ci_low, "hit_rate": self.hit_rate_ci_low, "sharpe": self.sharpe_ci_low}
+        low_map = {
+            "roi": self.roi_ci_low,
+            "hit_rate": self.hit_rate_ci_low,
+            "sharpe": self.sharpe_ci_low,
+        }
         low = low_map.get(metric)
         return low is not None and low > 0
 
@@ -257,9 +260,12 @@ def format_ci(ci: BootstrapCI) -> str:
 
     lines = [
         f"Bootstrap CI (n={ci.n_bets} bets, {ci.n_iter} iterations)",
-        f"  ROI    : {_pct(ci.roi_mean)}  [95% CI: {_pct(ci.roi_ci_low)} .. {_pct(ci.roi_ci_high)}]  {sig('roi')}",
-        f"  HitRate: {_pct(ci.hit_rate_mean)}  [95% CI: {_pct(ci.hit_rate_ci_low)} .. {_pct(ci.hit_rate_ci_high)}]  {sig('hit_rate')}",
-        f"  Sharpe : {_val(ci.sharpe_mean)}  [95% CI: {_val(ci.sharpe_ci_low)} .. {_val(ci.sharpe_ci_high)}]  {sig('sharpe')}",
+        f"  ROI    : {_pct(ci.roi_mean)}  "
+        f"[95% CI: {_pct(ci.roi_ci_low)} .. {_pct(ci.roi_ci_high)}]  {sig('roi')}",
+        f"  HitRate: {_pct(ci.hit_rate_mean)}  "
+        f"[95% CI: {_pct(ci.hit_rate_ci_low)} .. {_pct(ci.hit_rate_ci_high)}]  {sig('hit_rate')}",
+        f"  Sharpe : {_val(ci.sharpe_mean)}  "
+        f"[95% CI: {_val(ci.sharpe_ci_low)} .. {_val(ci.sharpe_ci_high)}]  {sig('sharpe')}",
     ]
     return "\n".join(lines)
 

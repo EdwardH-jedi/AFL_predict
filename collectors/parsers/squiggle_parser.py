@@ -76,7 +76,8 @@ def parse_games(raw: dict) -> list[ParsedGame]:
     """
     if not isinstance(raw, dict) or "games" not in raw:
         raise SquiggleParseError(
-            f"Unexpected Squiggle games response shape: {list(raw.keys()) if isinstance(raw, dict) else type(raw)}"
+            "Unexpected Squiggle games response shape: "
+            f"{list(raw.keys()) if isinstance(raw, dict) else type(raw)}"
         )
 
     results: list[ParsedGame] = []
@@ -100,7 +101,8 @@ def parse_teams(raw: dict) -> list[ParsedTeam]:
     """
     if not isinstance(raw, dict) or "teams" not in raw:
         raise SquiggleParseError(
-            f"Unexpected Squiggle teams response shape: {list(raw.keys()) if isinstance(raw, dict) else type(raw)}"
+            "Unexpected Squiggle teams response shape: "
+            f"{list(raw.keys()) if isinstance(raw, dict) else type(raw)}"
         )
 
     results: list[ParsedTeam] = []

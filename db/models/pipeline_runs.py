@@ -1,13 +1,11 @@
 """db/models/pipeline_runs.py — Audit log for each individual pipeline job execution."""
 
-import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base
-
 
 # Valid job-level status values
 JOB_STATUSES = {"pending", "running", "success", "partial_failure", "failed", "skipped"}

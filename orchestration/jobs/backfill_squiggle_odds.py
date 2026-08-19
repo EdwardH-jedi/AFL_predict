@@ -28,7 +28,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, timedelta
 
 import httpx
 from loguru import logger
@@ -197,7 +197,7 @@ def _build_snapshot(match: Match, hconfidence: float) -> OddsSnapshot:
     # Snapshot time: 2 hours before kickoff so BookmakerExtractor picks it up
     match_time = match.match_time
     if match_time.tzinfo is None:
-        match_time = match_time.replace(tzinfo=timezone.utc)
+        match_time = match_time.replace(tzinfo=UTC)
     snapshot_time = match_time - _PRE_MATCH_OFFSET
 
     return OddsSnapshot(
@@ -233,8 +233,12 @@ def _fetch_tips(season: int) -> list[dict]:
 
 
 def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Backfill historical AFL odds from Squiggle Punters tips.")
-    p.add_argument("--seasons", nargs="+", type=int, help="Seasons to backfill (default: 2015–2025)")
+    p = argparse.ArgumentParser(
+        description="Backfill historical AFL odds from Squiggle Punters tips."
+    )
+    p.add_argument(
+        "--seasons", nargs="+", type=int, help="Seasons to backfill (default: 2015–2025)"
+    )
     p.add_argument("--dry-run", action="store_true", help="Log without writing to DB")
     return p.parse_args()
 

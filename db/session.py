@@ -57,7 +57,7 @@ get_session = get_db
 
 def create_all_tables() -> None:
     """Create all tables defined in ORM models. Used for local dev / testing."""
-    from db.base import Base  # noqa: F401 — import models to register them
     import db.models  # noqa: F401 — ensures all models are registered
+    from db.base import Base  # noqa: F401 — import models to register them
 
     Base.metadata.create_all(bind=engine)

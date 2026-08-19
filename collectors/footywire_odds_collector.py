@@ -13,9 +13,8 @@ NOTE: This scraper uses a 2-second politeness delay between requests.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Iterator
+from collections.abc import Iterator
+from dataclasses import dataclass
 
 import httpx
 from bs4 import BeautifulSoup
@@ -75,7 +74,9 @@ class FootywireOddsCollector:
             try:
                 year_records = list(self._collect_year(year))
                 records.extend(year_records)
-                logger.info(f"FootywireOddsCollector: {year} — {len(year_records)} records collected.")
+                logger.info(
+                    f"FootywireOddsCollector: {year} — {len(year_records)} records collected."
+                )
             except Exception as exc:
                 logger.warning(f"FootywireOddsCollector: {year} failed — {exc}")
         logger.info(f"FootywireOddsCollector: total {len(records)} records.")
@@ -167,14 +168,16 @@ class FootywireOddsCollector:
                     logger.debug(f"FootywireOddsCollector: retry {attempt+1} for {url} ({exc})")
                     time.sleep(self.request_delay * (attempt + 2))
                 else:
-                    logger.warning(f"FootywireOddsCollector: failed after 3 attempts — {url}: {exc}")
+                    logger.warning(
+                        f"FootywireOddsCollector: failed after 3 attempts — {url}: {exc}"
+                    )
                     return None
         return None
 
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> "FootywireOddsCollector":
+    def __enter__(self) -> FootywireOddsCollector:
         return self
 
     def __exit__(self, *_: object) -> None:

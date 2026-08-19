@@ -14,19 +14,18 @@ os.environ.setdefault("DB_URL", "sqlite:///:memory:")
 os.environ.setdefault("ODDS_API_KEY", "")
 os.environ.setdefault("SQUIGGLE_USER_AGENT", "test")
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from db.base import Base
 from db.models.matches import Match
 from db.models.odds_snapshots import OddsSnapshot
 from db.models.teams import Team
 from features.extractors.bookmaker import BookmakerExtractor
-
 
 # ---------------------------------------------------------------------------
 # Test DB fixtures
@@ -61,7 +60,7 @@ def team_pair(db):
 @pytest.fixture
 def match_with_odds(db, team_pair):
     t1, t2 = team_pair
-    mt = datetime(2025, 5, 1, 9, 30, tzinfo=timezone.utc)
+    mt = datetime(2025, 5, 1, 9, 30, tzinfo=UTC)
 
     m = Match(
         season=2025, round_number=5, round_label="Round 5",
@@ -105,7 +104,7 @@ class TestBookmakerExtractor:
         m = Match(
             season=2025, round_number=99, round_label="Round 99",
             home_team_id=t1.id, away_team_id=t2.id,
-            match_time=datetime(2025, 9, 1, tzinfo=timezone.utc),
+            match_time=datetime(2025, 9, 1, tzinfo=UTC),
             is_final=False,
         )
         db.add(m)
@@ -130,7 +129,7 @@ class TestBookmakerExtractor:
 
     def test_snapshot_after_match_time_excluded(self, db, team_pair):
         t1, t2 = team_pair
-        mt = datetime(2025, 6, 1, 10, 0, tzinfo=timezone.utc)
+        mt = datetime(2025, 6, 1, 10, 0, tzinfo=UTC)
         m = Match(
             season=2025, round_number=11, round_label="Round 11",
             home_team_id=t1.id, away_team_id=t2.id,
@@ -158,7 +157,7 @@ class TestBookmakerExtractor:
 
     def test_latest_pre_match_snapshot_selected(self, db, team_pair):
         t1, t2 = team_pair
-        mt = datetime(2025, 7, 1, 14, 0, tzinfo=timezone.utc)
+        mt = datetime(2025, 7, 1, 14, 0, tzinfo=UTC)
         m = Match(
             season=2025, round_number=15, round_label="Round 15",
             home_team_id=t1.id, away_team_id=t2.id,

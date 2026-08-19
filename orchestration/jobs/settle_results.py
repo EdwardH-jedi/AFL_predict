@@ -15,7 +15,7 @@ CLV (Closing Line Value):
 """
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 from sqlalchemy import desc
@@ -45,7 +45,7 @@ def run() -> None:
 
             duration = time.monotonic() - start
             run_record.status = "completed"
-            run_record.completed_at = datetime.now(tz=timezone.utc)
+            run_record.completed_at = datetime.now(tz=UTC)
             run_record.duration_seconds = round(duration, 2)
             run_record.records_processed = settled_count
             logger.info(f"==> settle_results: settled {settled_count} bets in {duration:.1f}s")
@@ -83,7 +83,7 @@ def _settle_pending(db) -> int:
             db, match, rec.side, rec.recommended_odds
         )
 
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         outcome = BetOutcome(
             recommendation_id=rec.id,
             bet_side=rec.side,
@@ -163,7 +163,6 @@ def _did_win(side: str, result: str) -> bool:
 
 def _log_clv_summary(db) -> None:
     """Log a CLV summary across all settled paper bets with CLV data."""
-    from sqlalchemy import func as sqlfunc
     rows = (
         db.query(BetOutcome)
         .filter(

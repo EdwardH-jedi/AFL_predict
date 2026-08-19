@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, SmallInteger, String, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, SmallInteger, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base
@@ -30,8 +30,12 @@ class PlayerLineup(Base):
     __tablename__ = "player_lineups"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    match_id: Mapped[int] = mapped_column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
-    team_id: Mapped[int] = mapped_column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    match_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("matches.id"), nullable=False, index=True
+    )
+    team_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("teams.id"), nullable=False, index=True
+    )
 
     # Number of players named in the lineup (should be 22 + 4 emergency)
     players_listed: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
@@ -74,8 +78,12 @@ class PlayerStat(Base):
     __tablename__ = "player_stats"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    match_id: Mapped[int] = mapped_column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
-    team_id: Mapped[int] = mapped_column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    match_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("matches.id"), nullable=False, index=True
+    )
+    team_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("teams.id"), nullable=False, index=True
+    )
 
     # Player identifier (AFL Tables player ID)
     player_external_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
@@ -95,4 +103,7 @@ class PlayerStat(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     def __repr__(self) -> str:
-        return f"<PlayerStat match_id={self.match_id} player={self.player_name!r} disp={self.disposals}>"
+        return (
+            f"<PlayerStat match_id={self.match_id} "
+            f"player={self.player_name!r} disp={self.disposals}>"
+        )
