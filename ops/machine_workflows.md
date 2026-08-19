@@ -24,14 +24,14 @@ python --version
 
 | 머신 | 경로 |
 |------|------|
-| 서버 컴퓨터 (RX 6600) | `C:\Users\edwar\AFL_predict` |
+| 서버 컴퓨터 (RX 6600) | `C:\Users\<you>\AFL_predict` |
 | 메인 컴퓨터 (RTX 5080) | `C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict` |
 
 ### 3. venv 생성 및 패키지 설치 (각 머신에서 독립적으로)
 
 **서버:**
 ```cmd
-cd "C:\Users\edwar\AFL_predict"
+cd "C:\Users\<you>\AFL_predict"
 python -m venv .venv
 .venv\Scripts\activate.bat
 pip install -r requirements.txt
@@ -84,7 +84,7 @@ host    afl_predict    afl_user    192.168.0.0/24    md5
 ### Step 3 — .env 파일 생성
 
 ```cmd
-cd "C:\Users\edwar\AFL_predict"
+cd "C:\Users\<you>\AFL_predict"
 copy .env.example .env
 ```
 
@@ -118,7 +118,7 @@ TELEGRAM_ENABLED=false
 ### Step 4 — DB 스키마 초기화
 
 ```cmd
-cd "C:\Users\edwar\AFL_predict"
+cd "C:\Users\<you>\AFL_predict"
 .venv\Scripts\activate.bat
 alembic upgrade head
 ```
@@ -126,7 +126,7 @@ alembic upgrade head
 ### Step 5 — 초기 데이터 수집 (최초 1회)
 
 ```cmd
-cd "C:\Users\edwar\AFL_predict"
+cd "C:\Users\<you>\AFL_predict"
 .venv\Scripts\activate.bat
 
 rem AFL 픽스처 수집 (2022~현재)
@@ -158,7 +158,7 @@ python -m orchestration.jobs.fetch_player_stats --season 2025
 - 트리거: 매일 08:00
 - 동작: 프로그램/스크립트
   ```
-  C:\Users\edwar\AFL_predict\.venv\Scripts\python.exe
+  C:\Users\<you>\AFL_predict\.venv\Scripts\python.exe
   ```
   인수:
   ```
@@ -166,7 +166,7 @@ python -m orchestration.jobs.fetch_player_stats --season 2025
   ```
   시작 위치:
   ```
-  C:\Users\edwar\AFL_predict
+  C:\Users\<you>\AFL_predict
   ```
 
 **작업 2: 날씨 수집 (매일 07:00)**
@@ -185,19 +185,19 @@ python -m orchestration.jobs.fetch_player_stats --season 2025
 
 시작 프로그램에 API 서버를 등록합니다.
 
-`C:\Users\edwar\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\` 에
+`C:\Users\<you>\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\` 에
 `start_afl_api.bat` 파일 생성:
 
 ```bat
 @echo off
-cd /d "C:\Users\edwar\AFL_predict"
+cd /d "C:\Users\<you>\AFL_predict"
 call .venv\Scripts\activate.bat
 start /b uvicorn api.main:app --host 0.0.0.0 --port 8000 >> logs\api.log 2>&1
 ```
 
 로그 폴더 생성:
 ```cmd
-mkdir "C:\Users\edwar\AFL_predict\logs"
+mkdir "C:\Users\<you>\AFL_predict\logs"
 ```
 
 ---
@@ -324,7 +324,7 @@ python -m orchestration.jobs.run_backtest --mode expanding
 
 ### 서버 (RX 6600) 확인
 ```cmd
-cd "C:\Users\edwar\AFL_predict"
+cd "C:\Users\<you>\AFL_predict"
 .venv\Scripts\activate.bat
 
 rem 1. DB 연결

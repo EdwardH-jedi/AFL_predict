@@ -52,8 +52,8 @@ collector(08:00)와 predictor(09:30) 사이 90분 간격은 수집 재시도 여
 등록 방법 (RX 6600, 관리자 PowerShell):
 
 ```powershell
-$py  = "C:\Users\edwar\AFL_predict\.venv\Scripts\python.exe"
-$dir = "C:\Users\edwar\AFL_predict"
+$py  = "C:\Users\<you>\AFL_predict\.venv\Scripts\python.exe"
+$dir = "C:\Users\<you>\AFL_predict"
 Register-ScheduledTask -TaskName "AFL_FetchPlayerStats" `
   -Action  (New-ScheduledTaskAction -Execute $py -Argument "-m orchestration.jobs.fetch_player_stats" -WorkingDirectory $dir) `
   -Trigger (New-ScheduledTaskTrigger -Weekly -DaysOfWeek Thursday -At "18:30") `

@@ -1,5 +1,9 @@
-# Environment
+# ---------------------------------------------------------------------------
+# Environment / secrets
+# ---------------------------------------------------------------------------
 .env
+.env.*
+!.env.example
 .venv/
 venv/
 __pycache__/
@@ -7,34 +11,54 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Database
+# ---------------------------------------------------------------------------
+# Databases
+# ---------------------------------------------------------------------------
 *.db
 *.sqlite3
 
-# Model artifacts and raw data (large files)
-storage/raw_snapshots/**/*.json
-storage/raw_snapshots/**/*.parquet
+# ---------------------------------------------------------------------------
+# Generated runtime artifacts
+# ---------------------------------------------------------------------------
+# Raw API snapshots, feature parquets, backtest result JSON.
+storage/raw_snapshots/**
+!storage/raw_snapshots/.gitkeep
+# Trained model binaries (tuned hyperparameter JSON files ARE tracked).
 storage/model_artifacts/**/*.pkl
+storage/model_artifacts/run_*/
+# Daily pipeline / role-audit summary artifacts.
+storage/daily_summaries/**
+!storage/daily_summaries/.gitkeep
+# Pipeline logs and local codex review transcripts.
+logs/**
+!logs/.gitkeep
+reviews/
+data/
+# Standalone dashboard payload — regenerate with `make demo`.
+static/quant-dashboard/predictions.json
 
-# IDE
+# ---------------------------------------------------------------------------
+# Node (frontend/)
+# ---------------------------------------------------------------------------
+node_modules/
+frontend/dist/
+npm-debug.log*
+
+# ---------------------------------------------------------------------------
+# Tooling
+# ---------------------------------------------------------------------------
 .vscode/
 .idea/
 *.swp
-
-# Test / coverage
+.DS_Store
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .coverage
 htmlcov/
-
-# Build
 dist/
 build/
 *.egg-info/
 
 # Claude Code local settings
 .claude/
-
-# generated artifacts
-reviews/
-data/
-static/quant-dashboard/predictions.json

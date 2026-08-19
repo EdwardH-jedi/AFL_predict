@@ -81,7 +81,7 @@ when value appears.
 
 **Relevance to this system:** The AFL Predict system already computes its own edge
 estimates from The Odds API odds. It does not currently track closing-line movement
-(see `docs/differentiation_plan.md` Priority 3). OpenClaw could potentially serve
+(see `docs/archive/differentiation_plan.md` Priority 3). OpenClaw could potentially serve
 as an odds movement data source or a CLV validation tool.
 
 **Would it improve reliability?** No. It addresses a different problem — live odds
