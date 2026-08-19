@@ -9,19 +9,17 @@ No network calls or real ingestion.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
 
 from db.models.bankroll_logs import BankrollLog
 from db.models.bet_outcomes import BetOutcome
-from db.models.daily_pipeline_runs import DailyPipelineRun
-from db.models.pipeline_runs import PipelineRun
-from db.models.recommendations import Recommendation
-from db.models.predictions import Prediction
 from db.models.matches import Match
-
+from db.models.pipeline_runs import PipelineRun
+from db.models.predictions import Prediction
+from db.models.recommendations import Recommendation
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -35,7 +33,7 @@ def recs_and_outcomes(db_session):
         external_id="test-m1",
         home_team_id=1,
         away_team_id=2,
-        match_time=datetime(2025, 4, 1, tzinfo=timezone.utc),
+        match_time=datetime(2025, 4, 1, tzinfo=UTC),
         round_number=1,
         season=2025,
     )
@@ -68,7 +66,7 @@ def recs_and_outcomes(db_session):
             recommendation_id=rec.id,
             won=(i % 2 == 0),  # alternating win/loss
             profit_loss_units=0.90 if i % 2 == 0 else -1.0,
-            settled_at=datetime.now(tz=timezone.utc),
+            settled_at=datetime.now(tz=UTC),
         )
         db_session.add(outcome)
         outcomes.append(outcome)
@@ -159,7 +157,7 @@ class TestDrawdownCheck:
 class TestIngestionHealthCheck:
     def _run_check(self, db):
         from evaluation.live_readiness import _check_ingestion_health
-        return _check_ingestion_health(db, datetime.now(tz=timezone.utc))
+        return _check_ingestion_health(db, datetime.now(tz=UTC))
 
     def test_pass_with_no_failures(self, db_session):
         result = self._run_check(db_session)
@@ -171,7 +169,7 @@ class TestIngestionHealthCheck:
             job_name="ingest_afl",
             status="failed",
             daily_run_id=None,
-            started_at=datetime.now(tz=timezone.utc),
+            started_at=datetime.now(tz=UTC),
         ))
         db_session.flush()
 
@@ -186,7 +184,7 @@ class TestIngestionHealthCheck:
                 job_name="ingest_afl",
                 status="failed",
                 daily_run_id=None,
-                started_at=datetime.now(tz=timezone.utc),
+                started_at=datetime.now(tz=UTC),
             ))
         db_session.flush()
 
@@ -229,7 +227,7 @@ class TestDeriveOverall:
 
 class TestCriticalTodosCheck:
     def test_fail_when_todos_present(self):
-        from evaluation.live_readiness import _check_critical_todos, CRITICAL_TODOS
+        from evaluation.live_readiness import CRITICAL_TODOS, _check_critical_todos
         if not CRITICAL_TODOS:
             pytest.skip("No critical TODOs defined — check passes by design.")
         result = _check_critical_todos()
@@ -237,7 +235,32 @@ class TestCriticalTodosCheck:
         assert result.value == len(CRITICAL_TODOS)
 
     def test_pass_when_todos_empty(self):
-        from evaluation.live_readiness import _check_critical_todos
-        with patch("evaluation.live_readiness.CRITICAL_TODOS", []):
-            result = _check_critical_todos()
+        """No static blockers AND no runtime blockers -> pass.
+
+        The runtime TAB-confirmation blocker has to be cleared too. Patching
+        only CRITICAL_TODOS left the check reading the real environment, where
+        TAB_BOOKMAKER_CONFIRMED defaults to false, so this asserted 'pass' on a
+        path that can never pass.
+        """
+        from evaluation import live_readiness
+
+        with patch.object(live_readiness, "CRITICAL_TODOS", []), patch.object(
+            live_readiness.settings, "tab_bookmaker_confirmed", True
+        ):
+            result = live_readiness._check_critical_todos()
+
         assert result.status == "pass"
+        assert result.value == 0
+
+    def test_fail_when_only_runtime_blocker_outstanding(self):
+        """The runtime TAB check must block on its own, with no static TODOs."""
+        from evaluation import live_readiness
+
+        with patch.object(live_readiness, "CRITICAL_TODOS", []), patch.object(
+            live_readiness.settings, "tab_bookmaker_confirmed", False
+        ):
+            result = live_readiness._check_critical_todos()
+
+        assert result.status == "fail"
+        assert result.value == 1
+        assert "TAB" in result.detail

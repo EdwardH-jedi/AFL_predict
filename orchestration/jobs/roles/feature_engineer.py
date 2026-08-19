@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +42,7 @@ def run() -> None:
     parquet_path = _latest_parquet()
     if parquet_path is None:
         report = {
-            "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+            "generated_at": datetime.now(tz=UTC).isoformat(),
             "verdict": "no_data",
             "warnings": ["No feature parquet found under storage/raw_snapshots/features/."],
             "parquet_path": None,
@@ -50,9 +50,11 @@ def run() -> None:
     else:
         df = pd.read_parquet(parquet_path)
         report = {
-            "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+            "generated_at": datetime.now(tz=UTC).isoformat(),
             "parquet_path": str(parquet_path),
-            "parquet_mtime": datetime.fromtimestamp(parquet_path.stat().st_mtime, tz=timezone.utc).isoformat(),
+            "parquet_mtime": datetime.fromtimestamp(
+                parquet_path.stat().st_mtime, tz=UTC
+            ).isoformat(),
             "n_rows": int(len(df)),
             "n_cols": int(len(df.columns)),
             "columns": _column_report(df),
@@ -114,7 +116,6 @@ def _column_report(df: pd.DataFrame) -> list[dict[str, Any]]:
 def _target_correlation(df: pd.DataFrame) -> dict[str, float]:
     if "home_win" not in df.columns:
         return {}
-    target = df["home_win"]
     result: dict[str, float] = {}
     for col in df.columns:
         if col == "home_win" or not pd.api.types.is_numeric_dtype(df[col]):
@@ -162,7 +163,9 @@ def _verdict(report: dict[str, Any]) -> tuple[str, list[str]]:
 
     poor = [c for c in report["columns"] if c["non_null_pct"] < 50 and c["name"] != "home_win"]
     if len(poor) > 5:
-        warnings.append(f"{len(poor)} columns have non-null < 50% — expected features may be unwired.")
+        warnings.append(
+            f"{len(poor)} columns have non-null < 50% — expected features may be unwired."
+        )
 
     if leakage.get("n_errors", 0):
         return "critical", warnings

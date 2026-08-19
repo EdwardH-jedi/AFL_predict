@@ -15,7 +15,7 @@ This is a SOFT job — failure is logged but does not stop the pipeline.
 
 import json
 import time
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +32,8 @@ from db.models.recommendations import Recommendation
 from db.session import db_session
 from orchestration.jobs.check_data_freshness import (
     build_report as build_freshness_report,
+)
+from orchestration.jobs.check_data_freshness import (
     get_last_result as get_freshness,
 )
 
@@ -77,7 +79,7 @@ def write_summary_artifact() -> Path:
 # ---------------------------------------------------------------------------
 
 def _build_summary() -> dict[str, Any]:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     today = date.today()
 
     with db_session() as db:
@@ -185,7 +187,7 @@ def _bankroll_snapshot(db) -> dict[str, Any]:
     if not logs:
         return {"current_balance": None, "peak_balance": None, "drawdown": None, "n_events": 0}
 
-    balances = [l.balance_after for l in logs]
+    balances = [log.balance_after for log in logs]
     current = balances[-1]
     peak = max(balances)
     drawdown = round((peak - current) / peak, 6) if peak > 0 else 0.0
@@ -228,7 +230,10 @@ def _no_bet_analysis(recs: list[dict]) -> dict[str, Any]:
         return {"is_no_bet_day": False, "reason": None, "today_rec_count": len(today_recs)}
     return {
         "is_no_bet_day": True,
-        "reason": "No recommendations generated today (edge below threshold or no upcoming matches).",
+        "reason": (
+            "No recommendations generated today "
+            "(edge below threshold or no upcoming matches)."
+        ),
         "today_rec_count": 0,
     }
 

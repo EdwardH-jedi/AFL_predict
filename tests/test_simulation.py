@@ -13,7 +13,6 @@ import pytest
 
 from backtesting.simulation import _kelly_fraction, settle_bets, simulate_recommendations
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -146,9 +145,10 @@ class TestSettleBets:
         bets = self._make_bets()
         result_map = {1: 1, 2: 0, 3: 0}  # match 1: home win, match 2: away win, match 3: away win
         settled = settle_bets(bets, pd.Series(), match_id_to_result=result_map)
-        assert settled.loc[settled["match_id"] == 1, "won"].values[0] == True
-        assert settled.loc[settled["match_id"] == 2, "won"].values[0] == True  # away bet, away wins
-        assert settled.loc[settled["match_id"] == 3, "won"].values[0] == False  # home bet, away wins
+        # match 1: home bet, home wins. match 2: away bet, away wins.
+        # match 3: home bet, away wins. tolist() normalises numpy bools.
+        won_by_match = dict(zip(settled["match_id"].tolist(), settled["won"].tolist()))
+        assert won_by_match == {1: True, 2: True, 3: False}
 
     def test_profit_positive_on_win(self):
         bets = self._make_bets().iloc[:1]  # only match 1, home bet
@@ -173,4 +173,4 @@ class TestSettleBets:
         bets = self._make_bets().iloc[:1]
         actuals = pd.Series({1: 1})
         settled = settle_bets(bets, actuals)
-        assert settled["won"].values[0] == True
+        assert settled["won"].tolist() == [True]

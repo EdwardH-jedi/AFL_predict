@@ -33,7 +33,6 @@ import csv
 import io
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 
 import httpx
 from loguru import logger
@@ -110,7 +109,9 @@ class PlayerCollector:
             return 0
 
         raw_text = response.text
-        self._snapshots.save({"season": season, "content": raw_text[:500]}, f"player_stats_{season}")
+        self._snapshots.save(
+            {"season": season, "content": raw_text[:500]}, f"player_stats_{season}"
+        )
 
         rows = self._parse_csv(raw_text, season)
         if not rows:
@@ -323,10 +324,8 @@ class PlayerCollector:
 
                 # Normalise: top-22 by prior score represent "expected" team
                 player_prior_scores.sort(reverse=True)
-                actual_top22 = sum(player_prior_scores[:22])
-                # Estimate what a "full 22" should contribute (top-22 from last season avg)
-                expected = actual_top22  # by definition they all played -> 1.0
-
+                # When real lineups exist every listed player did play, so the
+                # top-22 prior sum equals its own expectation and availability is 1.0.
                 avail = 1.0  # if we have actual lineups, all listed played
                 key_absent = 0  # no absences when we have actual data
 

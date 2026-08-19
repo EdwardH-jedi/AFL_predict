@@ -32,7 +32,7 @@ Design:
 from __future__ import annotations
 
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -100,7 +100,7 @@ def notify_bets(db: Session | None = None) -> bool:
 def _load_todays_picks(db: Session) -> list[dict]:
     """Load pending recommendations for matches happening today (by match_time)."""
     today = date.today()
-    start = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+    start = datetime(today.year, today.month, today.day, tzinfo=UTC)
     end = start + timedelta(days=1)
 
     recs = (
@@ -131,21 +131,27 @@ def _load_todays_picks(db: Session) -> list[dict]:
         edge = pred.home_edge if is_home else pred.away_edge
         bm_implied = (side_prob - edge) if (side_prob is not None and edge is not None) else None
 
-        picks.append({
-            "side": rec.side.upper(),
-            "pick_team": home_team.name if (is_home and home_team) else (away_team.name if away_team else "Unknown"),
-            "opp_team": away_team.name if (is_home and away_team) else (home_team.name if home_team else "Unknown"),
-            "is_home": is_home,
-            "match_time": match.match_time,
-            "round_label": match.round_label,
-            "odds": rec.recommended_odds,
-            "stake_fraction": rec.stake_fraction,
-            "stake_dollars": rec.stake_dollars,
-            "model_prob": side_prob,
-            "bm_implied": bm_implied,
-            "edge": edge,
-            "paper_trade": rec.paper_trade,
-        })
+        picks.append(
+            {
+                "side": rec.side.upper(),
+                "pick_team": home_team.name
+                if (is_home and home_team)
+                else (away_team.name if away_team else "Unknown"),
+                "opp_team": away_team.name
+                if (is_home and away_team)
+                else (home_team.name if home_team else "Unknown"),
+                "is_home": is_home,
+                "match_time": match.match_time,
+                "round_label": match.round_label,
+                "odds": rec.recommended_odds,
+                "stake_fraction": rec.stake_fraction,
+                "stake_dollars": rec.stake_dollars,
+                "model_prob": side_prob,
+                "bm_implied": bm_implied,
+                "edge": edge,
+                "paper_trade": rec.paper_trade,
+            }
+        )
 
     return picks
 
@@ -154,7 +160,6 @@ def _format_message(picks: list[dict]) -> str:
     """Build the Discord message string."""
     today_str = date.today().strftime("%a %d %b")
     sep = "=" * 32
-    div = "-" * 32
     mode_label = "PAPER TRADE" if picks[0]["paper_trade"] else "LIVE"
 
     lines = [
@@ -169,7 +174,7 @@ def _format_message(picks: list[dict]) -> str:
         if p["match_time"]:
             mt = p["match_time"]
             if mt.tzinfo is None:
-                mt = mt.replace(tzinfo=timezone.utc)
+                mt = mt.replace(tzinfo=UTC)
             mt_aest = mt.astimezone(_AEST)
             match_time_str = mt_aest.strftime("%a %d %b %I:%M%p")
         else:
