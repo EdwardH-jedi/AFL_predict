@@ -128,18 +128,24 @@ matches**, verified 2026-08-19. Full methodology and caveats:
 
 | Model | Brier ↓ | Log loss ↓ | Accuracy ↑ | ECE ↓ |
 |---|---|---|---|---|
-| **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | 0.0678 |
+| **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | **0.0678** |
 | Logistic regression | 0.2056 | 0.5961 | 67.7% | 0.0871 |
-| Ensemble (raw-component blend) | 0.2085 | 0.6042 | 67.6% | 0.0782 |
-| Elo | 0.2225 | 0.6343 | 63.1% | **0.0668** |
-| XGBoost | 0.2284 | 0.6693 | 64.3% | 0.1175 |
+| Ensemble (raw-component blend) | 0.2081 | 0.6033 | 67.4% | 0.0824 |
+| Elo | 0.2246 | 0.6382 | 62.1% | 0.0762 |
+| XGBoost | 0.2269 | 0.6649 | 65.8% | 0.1226 |
 | Poisson | 0.2558 | 0.7104 | 56.8% | 0.0926 |
 
 *Brier 0.25 = coin flip. Always picking the home team scores 56.8% on these
 same 1,413 matches — which is also exactly where Poisson lands.*
 
 **No model beats the market.** The best model lands about 3% worse than the
-bookmaker consensus on Brier, in aggregate and in every individual season.
+bookmaker consensus on Brier — in aggregate, in every individual season, and on
+log loss, accuracy and calibration error too.
+
+Hyperparameters come from each model class's own defaults, not from the tuners:
+the tuners search the same folds these numbers are measured on, so their output
+would be selection leakage. `docs/results.md` records how an earlier, circular
+version of that claim was caught and corrected.
 
 That is the honest result and it is the expected one. AFL head-to-head markets
 are liquid, and a consensus of bookmakers prices them with strictly more
@@ -148,11 +154,11 @@ the dataset. A model that *did* beat the closing consensus by a wide margin over
 1,413 matches would be evidence of leakage, not skill.
 
 **Leakage prevention** is enforced in code, not documented as an intention:
-`check_temporal_order` raises on any fold where a training match kicks off after
-a test match; Elo emits the pre-match rating before updating it; every rolling
-window filters on `match_time`; bookmaker features require
-`snapshot_time < match_time`. Asserted in `tests/test_splits.py` and
-`tests/test_demo.py`.
+`backtesting/splits.py::_assert_no_leakage` raises `LeakageError` on any fold
+where a training match kicks off after a test match; Elo emits the pre-match
+rating before updating it; every rolling window filters on `match_time`;
+bookmaker features require `snapshot_time < match_time`. Asserted in
+`tests/test_splits.py` and `tests/test_demo.py`.
 
 Simulated staking returns are reported in `docs/results.md` but carry heavy
 caveats — the historical consensus prices have **zero bookmaker margin**, which
@@ -281,8 +287,9 @@ Known limitations, stated plainly:
 
 - No historical weather was collected, so weather features are null throughout
   the evaluation and contribute nothing to the reported results.
-- Player availability is approximated from prior-season participation rather
-  than confirmed team sheets.
+- Player availability features are constant, not merely approximate: every row
+  is hard-coded to 1.0 with zero absences, so they contribute nothing to any
+  result. Real values need a pre-match team-sheet source.
 - The historical odds feed is a market consensus with no bookmaker margin, which
   makes simulated ROI structurally optimistic and CLV uncomputable on that data.
 - The static dashboard is a design prototype: panels the data layer does not
@@ -290,6 +297,12 @@ Known limitations, stated plainly:
   [`docs/assets/README.md`](docs/assets/README.md).
 - The accumulated paper-trading sample is not yet large enough to report CLV or
   realised ROI.
+- The evaluation is inspectable but not bit-reproducible from a clean clone: the
+  feature parquet is gitignored, regenerating it needs live Squiggle data that can
+  be retroactively corrected, and `requirements.txt` pins ranges rather than exact
+  versions. The exact result artifact is committed
+  ([`examples/backtest_2026-08-19.json`](examples/backtest_2026-08-19.json)) so
+  every reported number can be checked against its source.
 
 Exploratory work on LLM-generated match previews is **out of scope for this
 release**. No fine-tuning, LLM, or narrative-generation code exists in this

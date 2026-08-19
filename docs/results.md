@@ -57,23 +57,34 @@ ordering rule directly.
 
 ### Hyperparameter independence
 
-`run_backtest` loads Elo and XGBoost hyperparameters from
-`storage/model_artifacts/*_best_params.json` when present, and those files are
-produced by tuners (`backtesting/elo_tuner.py`, `backtesting/xgb_tuner.py`) that
-search over the *same* walk-forward folds reported here. Using tuner output
-selected on the reported folds would be selection leakage.
+The tuners (`backtesting/elo_tuner.py`, `backtesting/xgb_tuner.py`) search over
+the *same* walk-forward folds reported here. Any parameter they select is chosen
+with knowledge of the test data, so publishing metrics produced with it would be
+selection leakage.
 
-It does not affect this run, and that was verified rather than assumed: the
-committed parameter files hold values identical to the code defaults
-(Elo `k=24.0, home_advantage=50.0, season_regression=0.70`; XGBoost
-`max_depth=3, lr=0.1, n_estimators=200, subsample=0.8`), and re-running the
-backtest with both files moved aside produced **byte-identical metrics**. No
-tuner-selected value influenced any number on this page.
+**Every number on this page comes from `--untuned`**, which ignores
+`storage/model_artifacts/*_best_params.json` and uses each model class's own
+constructor defaults (`EloBaseline.__init__`, `XGBoostModel.__init__`). Nothing
+tuner-derived enters the chain. Running without the flag logs a warning saying
+the metrics are not publishable.
 
-The files carry no dataset or fold provenance, so that guarantee holds only for
-their current contents. If you re-tune, either use nested walk-forward tuning or
-freeze parameters on earlier seasons and keep the reported folds untouched — and
-re-verify with the files absent before publishing new numbers.
+This required a correction. An earlier version of this page argued the point by
+noting the metrics are unchanged when the parameter files are deleted. That proof
+is circular: `run_backtest`'s fallback literals are **not** the model constructor
+defaults (Elo defaults are k=30, home_advantage=60, season_regression=0.3; the
+fallbacks are 24/50/0.70), and `git show 17b0e1b` puts those literals and the two
+tuner artifacts in the same commit. Deleting the files therefore selected
+duplicated tuner-era values, so byte identity proved only that two code paths
+agreed with each other.
+
+`--untuned` is the actual fix, and it moves the numbers: Elo's Brier goes from
+0.2225 to 0.2246, XGBoost's from 0.2284 to 0.2269, the ensemble's from 0.2085 to
+0.2081. The conclusion does not change — the market still wins every column, in
+aggregate and in every season.
+
+The parameter files carry no dataset or fold provenance. If you re-tune, use
+nested walk-forward tuning, or freeze parameters on earlier seasons and keep the
+reported folds untouched.
 
 ---
 
@@ -83,12 +94,12 @@ Lower Brier and log loss are better. Brier 0.25 is a coin flip.
 
 | Model | Brier ↓ | Log loss ↓ | Accuracy ↑ | ECE ↓ |
 |---|---|---|---|---|
-| **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | 0.0678 |
+| **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | **0.0678** |
 | Logistic regression | 0.2056 | 0.5961 | 67.7% | 0.0871 |
-| Ensemble (raw-component blend) | 0.2085 | 0.6042 | 67.6% | 0.0782 |
-| Elo | 0.2225 | 0.6343 | 63.1% | **0.0668** |
-| XGBoost | 0.2284 | 0.6693 | 64.3% | 0.1175 |
-| Poisson (score distribution) | 0.2558 | 0.7104 | 56.8% | 0.0926 |
+| Ensemble (raw-component blend) | 0.2081 | 0.6033 | 67.4% | 0.0824 |
+| Elo | 0.2246 | 0.6382 | 62.1% | 0.0762 |
+| XGBoost | 0.2269 | 0.6649 | 65.8% | 0.1226 |
+| Poisson (global baseline) | 0.2558 | 0.7104 | 56.8% | 0.0926 |
 
 *n = 1,413 settled test matches across 7 folds. ECE = expected calibration error.*
 
@@ -96,13 +107,15 @@ Lower Brier and log loss are better. Brier 0.25 is a coin flip.
 
 | Season | n | Bookmaker | Logistic | Ensemble | Elo | XGBoost | Poisson |
 |---|---|---|---|---|---|---|---|
-| 2019 | 207 | 0.2139 | 0.2199 | 0.2296 | 0.2316 | 0.2849 | 0.2577 |
-| 2020 | 160 | 0.1955 | 0.2158 | 0.2043 | 0.2277 | 0.2193 | 0.2538 |
-| 2021 | 204 | 0.2183 | 0.2220 | 0.2228 | 0.2365 | 0.2406 | 0.2684 |
-| 2022 | 206 | 0.1863 | 0.1880 | 0.1985 | 0.2225 | 0.2221 | 0.2413 |
-| 2023 | 214 | 0.1982 | 0.2024 | 0.1996 | 0.2185 | 0.2027 | 0.2495 |
-| 2024 | 209 | 0.2092 | 0.2155 | 0.2202 | 0.2162 | 0.2464 | 0.2576 |
-| 2025 | 213 | 0.1763 | 0.1786 | 0.1843 | 0.2066 | 0.1828 | 0.2620 |
+| 2019 | 207 | **0.2139** | 0.2199 | 0.2316 | 0.2360 | 0.2876 | 0.2577 |
+| 2020 | 160 | **0.1955** | 0.2158 | 0.2037 | 0.2348 | 0.2113 | 0.2538 |
+| 2021 | 204 | **0.2183** | 0.2220 | 0.2255 | 0.2442 | 0.2456 | 0.2684 |
+| 2022 | 206 | **0.1863** | 0.1880 | 0.1949 | 0.2233 | 0.2127 | 0.2413 |
+| 2023 | 214 | **0.1982** | 0.2024 | 0.1991 | 0.2186 | 0.2031 | 0.2495 |
+| 2024 | 209 | **0.2092** | 0.2155 | 0.2203 | 0.2151 | 0.2500 | 0.2576 |
+| 2025 | 213 | **0.1763** | 0.1786 | 0.1815 | 0.2039 | 0.1765 | 0.2620 |
+
+Bookmaker consensus has the lowest Brier score in all seven seasons.
 
 2020 is the COVID season: 160 matches, shortened quarters, heavily disrupted
 venues and travel. Treat it as an outlier rather than a data point.
@@ -112,8 +125,9 @@ venues and travel. Treat it as an outlier rather than a data point.
 ## What these numbers actually say
 
 **The market wins.** No model beats the bookmaker consensus on any of Brier, log
-loss, or accuracy, in aggregate or in any individual season. The best model
-(logistic regression, 0.2056) sits about 3% worse than the benchmark (0.1997).
+loss, accuracy, or calibration error, in aggregate or in any individual season.
+The best model (logistic regression, 0.2056) sits about 3% worse than the
+benchmark (0.1997).
 
 That is the expected result, and reporting it plainly matters more than dressing
 it up. AFL head-to-head markets are liquid and efficient; a consensus of
@@ -132,15 +146,22 @@ This is a correlation across six models, not a measured effect. No no-odds
 ablation was run, so the size of any "lift from odds" is not established here.
 
 **The ensemble does not beat its best component.** Blending logistic (0.2056)
-with three weaker models yields 0.2085 — worse than logistic alone, better than
-everything else.
+with three weaker models yields 0.2081 — worse than logistic alone, better than
+everything else. Its ECE (0.0824) also sits between logistic's (0.0871) and
+Elo's (0.0762), so the blend does not buy calibration either; what it buys is
+variance reduction.
 
 The row is labelled *raw-component* deliberately. It uses the production weights
 from `Settings.ensemble_weights`, but not the production prediction function:
 `generate_recommendations` wraps logistic and XGBoost in `CalibratedModel`
 before blending, whereas the backtester fits them raw. Same blend, uncalibrated
-components. Treat it as a lower bound on the shipped ensemble's calibration, not
-as a measurement of it. It buys variance reduction and pays accuracy for it. Its ECE
+components.
+
+**So the shipped ensemble's calibration is not measured here, in either
+direction.** Calibrating two of four components individually does not imply the
+weighted blend has lower ECE — averaging calibrated with uncalibrated
+probabilities can move calibration either way. A production-equivalent number
+means running the calibration flow inside each fold, which this run does not do. It buys variance reduction and pays accuracy for it. Its ECE
 (0.0782) is better than logistic's (0.0871), which is the defensible reason to
 keep it: better-calibrated probabilities matter more than raw Brier for a
 staking decision. The weights are configuration
@@ -172,10 +193,10 @@ probability, staked at capped Kelly when edge > 3%.
 
 | Model | Bets | Hit rate* | Avg edge* | ROI |
 |---|---|---|---|---|
-| XGBoost | 1,217 | 55.2% | 0.159 | +3.9% |
-| Elo | 1,222 | 37.3% | 0.145 | +2.7% |
-| Ensemble | 1,104 | 37.9% | 0.099 | +0.2% |
+| Elo | 1,229 | 41.0% | 0.149 | +0.6% |
+| XGBoost | 1,216 | 54.9% | 0.153 | +0.4% |
 | Poisson | 1,299 | 35.9% | 0.211 | −0.4% |
+| Ensemble | 1,095 | 37.2% | 0.097 | −3.9% |
 | Logistic | 931 | 46.5% | 0.074 | −6.7% |
 | Bookmaker | 0 | — | — | — |
 
@@ -245,8 +266,11 @@ python -m orchestration.jobs.backfill_squiggle_odds
 # 3. Feature matrix
 python -m orchestration.jobs.build_features
 
-# 4. Walk-forward backtest over the odds-covered seasons
-python -m orchestration.jobs.run_backtest --min-season 2017 --max-season 2025
+# 4. Walk-forward backtest over the odds-covered seasons.
+#    --untuned is not optional for publishable numbers — see "Hyperparameter
+#    independence" above. Without it, the job loads tuner output selected on
+#    these same folds and logs a warning saying so.
+python -m orchestration.jobs.run_backtest --min-season 2017 --max-season 2025 --untuned
 ```
 
 The result artifact lands in `storage/raw_snapshots/backtest_results/` as JSON
@@ -257,8 +281,14 @@ every table above is transcribed from it and can be checked against it.
 
 Numbers are deterministic given the same data: models are seeded
 (`random_state=42`), splits are by calendar season, and no sampling is involved.
-Squiggle may retroactively correct historical records, so a much later re-run
-can differ slightly.
+
+They are **not** reproducible from committed inputs alone. The feature parquet is
+gitignored, step 1–3 depend on live Squiggle data that may be retroactively
+corrected, and `requirements.txt` pins version ranges rather than exact versions,
+so a scikit-learn or XGBoost minor release can shift the numbers. The committed
+artifact is inspectable and the tables above are checkable against it; exact
+recomputation from a clean clone is not guaranteed. Pinning a lockfile and
+committing the parquet would fix that and has not been done.
 
 For a fast, network-free taste of the pipeline on one held-out round, run
 `make demo` — but note that ten matches cannot evaluate a model. This page can.

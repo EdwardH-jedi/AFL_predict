@@ -18,9 +18,11 @@ Three layers enforce it:
 
 1. **Extractor design.** Every extractor filters to matches with an earlier
    `match_time` before computing anything.
-2. **Split assertions.** `backtesting/splits.py::check_temporal_order` raises
-   `LeakageError` unless `max(train.match_time) < min(test.match_time)` for
-   every fold. It is an assertion, not a warning.
+2. **Split assertions.** `backtesting/splits.py::_assert_no_leakage` raises
+   `LeakageError` unless `max(train.match_time) < min(test.match_time)`, and it
+   runs on every fold as it is built. It is an assertion, not a warning.
+   (`check_temporal_order` is a separate, weaker sortedness check that only
+   logs a warning — do not mistake it for the guard.)
 3. **Tests.** `tests/test_splits.py` asserts the ordering rule and that the
    guard actually fires on a violation; `tests/test_elo_extractor.py` and
    `tests/test_form_extractor.py` assert that a match's own result does not
@@ -45,7 +47,7 @@ output.
 | `bookmaker.py` | `bm_home_odds`, `bm_*_implied_prob`, `bm_overround` | Requires `snapshot_time < match_time`. Enforced in the query, not the caller. |
 | `odds_movement.py` | Opening odds, drift, `bm_line_move` | Compares two pre-match snapshots. |
 | `weather.py` | Temperature, wind, rain flags, `weather_scoring_index` | Forecast for the venue, captured pre-match. |
-| `player_availability.py` | Availability index, key absences | Derived from prior-season participation, not confirmed team sheets. Approximate — see caveats in [`results.md`](results.md). |
+| `player_availability.py` | Availability index, key absences | **Constant, not a feature.** Every row is 1.0 with zero absences (`collectors/player_collector.py` hard-codes it, because retrospective lineups only record who *did* play). Contributes nothing to any model. |
 
 The logistic and XGBoost models consume 29 of these columns
 (`models/logistic_baseline.py::FEATURE_COLS`). Elo uses only ratings; the
@@ -81,9 +83,11 @@ lurch, which is what makes it useful in a blend.
 
 ### Logistic regression
 
-L2-regularised logistic regression over the 29 features, standardised. Rows with
-NaN in a selected feature are dropped rather than imputed, so a missing odds
-snapshot cannot become a fabricated 0.5.
+L2-regularised logistic regression over the 29 features. Missing values are
+median-imputed and then standardised inside a fitted sklearn `Pipeline`, so
+training and inference impute from the same medians. Columns that are entirely
+null are dropped up front, since median imputation has nothing to fill them from;
+individual missing values do **not** drop a row.
 
 Linear, and on this dataset that is a feature. With ~1,600 training rows it
 generalises better than gradient boosting — see [`results.md`](results.md).

@@ -233,10 +233,13 @@ def _build_snapshot(match: Match, hconfidence: float, source_id: int | None = No
         away_implied_prob=round(away_prob, 6),
         overround=1.0,  # Punters normalises to 100%
         snapshot_time=snapshot_time,
+        # Both values must fit OddsSnapshot.snapshot_type, which is String(20).
+        # 'historical_model_estimate' (25 chars) would be rejected by PostgreSQL,
+        # losing exactly the provenance this tag exists to record.
         snapshot_type=(
-            "historical_consensus"
+            "historical_consensus"  # 20 chars
             if source_id == _PUNTERS_SOURCE_ID
-            else "historical_model_estimate"
+            else "historical_model"  # 16 chars
         ),
     )
 

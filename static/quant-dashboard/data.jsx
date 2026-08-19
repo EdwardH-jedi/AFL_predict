@@ -310,7 +310,12 @@ function _gamesToPicks(games) {
       : (g.home_win_prob ?? 0.5) >= 0.5;
     const pick = pickIsHome ? home : away;
     const pred = pickIsHome ? (g.home_win_prob ?? 0.5) : (1 - (g.home_win_prob ?? 0.5));
-    const odds = Number(g.tab_odds) || 0;
+    // Price the side actually being shown. `tab_odds` is the HOME price by
+    // definition, so using it for an away pick produced a wrong implied
+    // probability and a wrong edge. Prefer the recommended side's own price,
+    // then the per-side price, and only fall back to tab_odds.
+    const sideOdds = pickIsHome ? g.home_odds : g.away_odds;
+    const odds = Number(g.bet_odds ?? sideOdds ?? g.tab_odds) || 0;
     const impl = odds > 0 ? 1 / odds : 0;
     const edge = (pred - impl) * 100;
     const conf = _CONFIDENCE_TO_PIPS[String(g.confidence || "").toUpperCase()] ?? 3;

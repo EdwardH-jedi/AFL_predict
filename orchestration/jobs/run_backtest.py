@@ -15,9 +15,11 @@ to all training data. See docs/backtesting.md for the full methodology.
 
 CLI usage:
     python -m orchestration.jobs.run_backtest
-    python -m orchestration.jobs.run_backtest --mode rolling --train-seasons 3
-    python -m orchestration.jobs.run_backtest --min-train-seasons 2
+    python -m orchestration.jobs.run_backtest --mode rolling --min-train-seasons 3
     python -m orchestration.jobs.run_backtest --edge-threshold 0.05
+
+    # The form used for every number in docs/results.md:
+    python -m orchestration.jobs.run_backtest --min-season 2017 --max-season 2025 --untuned
 """
 
 import argparse
@@ -49,6 +51,7 @@ def run(
     max_kelly_fraction: float | None = None,
     min_season: int | None = None,
     max_season: int | None = None,
+    untuned: bool = False,
 ) -> None:
     """
     Run the full walk-forward backtest for all baseline models plus the ensemble.
@@ -66,6 +69,17 @@ def run(
                             makes the aggregate averages incomparable.
         max_season:         Drop seasons after this year (e.g. exclude an
                             in-progress season with mostly unsettled matches).
+        untuned:            Ignore storage/model_artifacts/*_best_params.json and
+                            use each model class's own constructor defaults.
+
+                            Use this for any result you intend to publish. The
+                            tuners (backtesting/elo_tuner.py, xgb_tuner.py) search
+                            over these same walk-forward folds, so parameters they
+                            selected are contaminated by the test data — reporting
+                            metrics produced with them overstates Elo and XGBoost.
+                            Note that the non-untuned fallback literals below are
+                            ALSO tuner-era values (they were committed alongside
+                            the tuner artifacts), so absent-file != untuned.
     """
     start = time.monotonic()
     logger.info(
@@ -90,31 +104,35 @@ def run(
         )
         return
 
-    # Load tuned hyperparameters
+    # Hyperparameters. `untuned` means the model classes' own constructor
+    # defaults, with nothing tuner-derived anywhere in the chain.
     artifacts_dir = Path(settings.model_artifacts_dir)
-    elo_params = _load_json_params(
-        artifacts_dir / "elo_best_params.json",
-        defaults={"k_factor": 24.0, "home_advantage": 50.0, "season_regression": 0.70},
-    )
-    xgb_params = _load_json_params(
-        artifacts_dir / "xgb_best_params.json",
-        defaults={"max_depth": 3, "learning_rate": 0.1, "n_estimators": 200, "subsample": 0.8},
-    )
+    if untuned:
+        logger.info(
+            "run_backtest: --untuned — ignoring *_best_params.json and using model "
+            "constructor defaults, so no value selected on these folds can leak in."
+        )
+        elo_params = None
+        xgb_params = None
+    else:
+        elo_params = _load_json_params(
+            artifacts_dir / "elo_best_params.json",
+            defaults={"k_factor": 24.0, "home_advantage": 50.0, "season_regression": 0.70},
+        )
+        xgb_params = _load_json_params(
+            artifacts_dir / "xgb_best_params.json",
+            defaults={"max_depth": 3, "learning_rate": 0.1, "n_estimators": 200, "subsample": 0.8},
+        )
+        logger.warning(
+            "run_backtest: using tuned hyperparameters. The tuners search these same "
+            "folds — do not publish these metrics as leakage-free. Use --untuned."
+        )
 
     models = [
         BookmakerBaseline(),
-        EloBaseline(
-            k_factor=elo_params["k_factor"],
-            home_advantage=elo_params["home_advantage"],
-            season_regression=elo_params["season_regression"],
-        ),
+        _make_elo(elo_params),
         LogisticBaseline(),
-        XGBoostModel(
-            max_depth=int(xgb_params["max_depth"]),
-            learning_rate=xgb_params["learning_rate"],
-            n_estimators=int(xgb_params["n_estimators"]),
-            subsample=xgb_params["subsample"],
-        ),
+        _make_xgb(xgb_params),
         PoissonModel(),
     ]
 
@@ -175,6 +193,29 @@ def run(
             print(fold_subset.sort_values(["fold_label", "model_name"]).to_string(index=False))
 
 
+def _make_elo(params: dict | None) -> EloBaseline:
+    """Elo from tuned params, or its own constructor defaults when params is None."""
+    if params is None:
+        return EloBaseline()
+    return EloBaseline(
+        k_factor=params["k_factor"],
+        home_advantage=params["home_advantage"],
+        season_regression=params["season_regression"],
+    )
+
+
+def _make_xgb(params: dict | None) -> XGBoostModel:
+    """XGBoost from tuned params, or its own constructor defaults when params is None."""
+    if params is None:
+        return XGBoostModel()
+    return XGBoostModel(
+        max_depth=int(params["max_depth"]),
+        learning_rate=params["learning_rate"],
+        n_estimators=int(params["n_estimators"]),
+        subsample=params["subsample"],
+    )
+
+
 def _filter_seasons(df, min_season: int | None, max_season: int | None):
     """Restrict the feature frame to a season range, logging what was dropped."""
     if min_season is None and max_season is None:
@@ -190,7 +231,7 @@ def _filter_seasons(df, min_season: int | None, max_season: int | None):
     return df.reset_index(drop=True)
 
 
-def _build_ensemble(elo_params: dict, xgb_params: dict):
+def _build_ensemble(elo_params: dict | None, xgb_params: dict | None):
     """
     Build the production-weighted ensemble for evaluation.
 
@@ -205,18 +246,9 @@ def _build_ensemble(elo_params: dict, xgb_params: dict):
         # omitting it here would silently benchmark a different blend than ships.
         "bookmaker_baseline": BookmakerBaseline,
         "logistic_baseline": LogisticBaseline,
-        "xgboost": lambda: XGBoostModel(
-            max_depth=int(xgb_params["max_depth"]),
-            learning_rate=xgb_params["learning_rate"],
-            n_estimators=int(xgb_params["n_estimators"]),
-            subsample=xgb_params["subsample"],
-        ),
+        "xgboost": lambda: _make_xgb(xgb_params),
         "poisson": PoissonModel,
-        "elo_baseline": lambda: EloBaseline(
-            k_factor=elo_params["k_factor"],
-            home_advantage=elo_params["home_advantage"],
-            season_regression=elo_params["season_regression"],
-        ),
+        "elo_baseline": lambda: _make_elo(elo_params),
     }
 
     components = []
@@ -301,6 +333,14 @@ def _parse_args() -> argparse.Namespace:
         "--max-season", type=int, default=None, dest="max_season",
         help="Drop seasons after this year (e.g. exclude an in-progress season)."
     )
+    p.add_argument(
+        "--untuned", action="store_true",
+        help=(
+            "Ignore *_best_params.json and use model constructor defaults. Required "
+            "for publishable numbers: the tuners search these same folds, so tuned "
+            "parameters are contaminated by the test data."
+        )
+    )
     return p.parse_args()
 
 
@@ -314,6 +354,7 @@ if __name__ == "__main__":
             max_kelly_fraction=args.max_kelly_fraction,
             min_season=args.min_season,
             max_season=args.max_season,
+            untuned=args.untuned,
         )
     except Exception:
         logger.exception("run_backtest: unhandled error")
