@@ -310,19 +310,27 @@ function _gamesToPicks(games) {
       : (g.home_win_prob ?? 0.5) >= 0.5;
     const pick = pickIsHome ? home : away;
     const pred = pickIsHome ? (g.home_win_prob ?? 0.5) : (1 - (g.home_win_prob ?? 0.5));
-    // Price the side this row is about — the model's pick. `tab_odds` is the
-    // HOME price by definition, so using it for an away pick gave a wrong
-    // implied probability and a wrong edge.
+
+    // INVARIANT: a probability is only ever compared against its OWN side's
+    // price. home probability <-> home price, away probability <-> away price.
     //
-    // Deliberately NOT g.bet_odds: that is the price of the *recommended bet*,
-    // which can be the opposite team from the pick (the model can favour the
-    // away side while the value sits on the home side). Pairing this row's
-    // `pred` with the other side's price is what produced the inflated edges.
-    // Falls back to tab_odds for legacy payloads without per-side prices.
-    const sideOdds = pickIsHome ? g.home_odds : g.away_odds;
-    const odds = Number(sideOdds ?? g.tab_odds) || 0;
-    const impl = odds > 0 ? 1 / odds : 0;
-    const edge = (pred - impl) * 100;
+    // Two ways this has gone wrong before, both of which fabricated an edge:
+    //   1. Using `tab_odds` for every row. It is the HOME price by definition,
+    //      so an away pick got the home price.
+    //   2. Using `bet_odds`. That is the price of the *recommended bet*, which
+    //      can be the opposite team from the pick — the model can favour the
+    //      away side while the value sits on the home side.
+    //
+    // `tab_odds` is therefore only an acceptable fallback for a HOME pick.
+    // When the matching side's price is unavailable, odds/impl/edge are null and
+    // the table renders them as unavailable. Borrowing the other side's price
+    // would invent a number, which is worse than showing nothing.
+    const sideOdds = pickIsHome ? (g.home_odds ?? g.tab_odds) : g.away_odds;
+    const oddsNum = Number(sideOdds);
+    const hasOdds = Number.isFinite(oddsNum) && oddsNum > 0;
+    const odds = hasOdds ? oddsNum : null;
+    const impl = hasOdds ? 1 / oddsNum : null;
+    const edge = hasOdds ? (pred - impl) * 100 : null;
     const conf = _CONFIDENCE_TO_PIPS[String(g.confidence || "").toUpperCase()] ?? 3;
     let parsedDate = g.game_date ? new Date(g.game_date) : new Date();
     if (Number.isNaN(parsedDate.getTime())) parsedDate = new Date();

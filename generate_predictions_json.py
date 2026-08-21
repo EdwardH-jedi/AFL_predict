@@ -15,7 +15,8 @@ Expected (or close-variant) columns in the input CSV:
     home_team, away_team, game_date / match_date / kickoff,
     venue, home_win_prob (model ensemble),
     xgboost_prob, poisson_prob, elo_prob,
-    tab_odds / home_odds, bet_recommended, bet_amount,
+    tab_odds / home_odds / bm_home_odds, away_odds / bm_away_odds,
+    bet_recommended, bet_amount,
     season, round / round_number.
 
 The script is tolerant to missing columns — fields are emitted as null or
@@ -114,7 +115,14 @@ def _row_to_game(row: dict) -> dict[str, Any]:
         parts = [v for v in (xgb, poi, elo) if v is not None]
         home_win_prob = sum(parts) / len(parts) if parts else None
 
-    tab_odds = _to_float(_first_present(row, "tab_odds", "home_odds", "best_home_odds"))
+    # Emit BOTH sides. The dashboard pairs each probability with its own side's
+    # price; if only the home price is present it shows the away row's odds and
+    # edge as unavailable rather than borrowing the home number.
+    home_odds = _to_float(
+        _first_present(row, "tab_odds", "home_odds", "bm_home_odds", "best_home_odds")
+    )
+    away_odds = _to_float(_first_present(row, "away_odds", "bm_away_odds", "best_away_odds"))
+    tab_odds = home_odds  # `tab_odds` is the HOME price by definition.
     bet_recommended = _to_bool(_first_present(row, "bet_recommended", default=False))
     bet_amount = _to_float(_first_present(row, "bet_amount", "stake_dollars", default=0)) or 0.0
 
@@ -133,6 +141,9 @@ def _row_to_game(row: dict) -> dict[str, Any]:
         "confidence": _confidence_label(home_win_prob),
         "bet_recommended": bool(bet_recommended),
         "bet_amount": round(float(bet_amount), 2),
+        "home_odds": round(home_odds, 3) if home_odds is not None else None,
+        "away_odds": round(away_odds, 3) if away_odds is not None else None,
+        # Retained for the existing predictions.json contract; equals home_odds.
         "tab_odds": round(tab_odds, 3) if tab_odds is not None else None,
         "xgboost_prob": round(xgb, 4) if xgb is not None else None,
         "poisson_prob": round(poi, 4) if poi is not None else None,

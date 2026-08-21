@@ -57,7 +57,10 @@ function PredictionsTable() {
             </thead>
             <tbody>
               {D.PICKS.map((p, i) => {
-                const edgePos = p.edge >= 0;
+                // odds/impl/edge are null when the pick's own side price is
+                // unavailable. Render that honestly rather than inventing one.
+                const hasOdds = p.odds != null && p.edge != null;
+                const edgePos = hasOdds && p.edge >= 0;
                 return (
                   <tr key={i}>
                     <td className="muted">{fmtDate(p.date)}</td>
@@ -81,12 +84,16 @@ function PredictionsTable() {
                       </span>
                     </td>
                     <td className="num-c">{(p.pred*100).toFixed(1)}%</td>
-                    <td className="num-c">{p.odds.toFixed(2)}</td>
-                    <td className="num-c muted">{(p.impl*100).toFixed(1)}%</td>
+                    <td className="num-c">{hasOdds ? p.odds.toFixed(2) : "—"}</td>
+                    <td className="num-c muted">{hasOdds ? (p.impl*100).toFixed(1) + "%" : "—"}</td>
                     <td className="num-c">
-                      <span className={"edge " + (edgePos ? "pos" : "neg")}>
-                        {edgePos ? "+" : ""}{p.edge.toFixed(1)}%
-                      </span>
+                      {hasOdds ? (
+                        <span className={"edge " + (edgePos ? "pos" : "neg")}>
+                          {edgePos ? "+" : ""}{p.edge.toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="muted" title="No price available for this side">—</span>
+                      )}
                     </td>
                     <td>
                       {p.result === "W" && <span className="res-w">W</span>}
