@@ -2,7 +2,7 @@
 
 ## Screenshots
 
-Both images were captured on 2026-08-19 from the static dashboard
+Both images were captured on 2026-08-21 from the static dashboard
 (`static/quant-dashboard/`) served by `python serve.py`, after running
 `make demo`. Capture command:
 
@@ -16,7 +16,7 @@ python serve.py --port 8123 &
 
 | File | Contents |
 |---|---|
-| `prediction-view.png` | Status banner plus the Recent predictions table. **Every value shown is real** — each row comes from the `predictions.json` the demo wrote. |
+| `prediction-view.png` | Status banner plus the Recent predictions table. **Every row is real** — each comes from the `predictions.json` the demo wrote, with each pick's probability priced against its own side of the market. |
 | `dashboard.png` | The full overview viewport, for layout context. **Read the caveat below before reusing it.** |
 
 ## Caveat: the dashboard mixes real and placeholder values
