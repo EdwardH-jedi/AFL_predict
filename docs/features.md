@@ -185,13 +185,16 @@ TODO: VenueExtractor — add home_ground and neutral_ground binary flags
 TODO: FormExtractor — consider cross-season form continuity (currently
       form carries across seasons, which may introduce season-boundary bias).
 
-TODO: BookmakerExtractor — support bookmaker preference ordering so the
-      best available bookmaker is selected when multiple bookmakers exist
-      for the same match.
+DONE: BookmakerExtractor bookmaker preference ordering — configured via
+      `ODDS_BOOKMAKER_PREFERENCE` (config/settings.py).
 
-TODO: Add head-to-head history features (team A win rate vs team B in
-      last N encounters).
+DONE: Head-to-head history features — features/extractors/h2h.py emits
+      h2h_home_win_rate_l5, h2h_avg_margin_l5, h2h_games_played.
 
-TODO: Add player availability features (injury lists, suspension data)
+PARTIAL: Player availability features exist
+      (features/extractors/player_availability.py) but carry no signal: the
+      historical collector hard-codes availability to 1.0 with zero absences,
+      because retrospective lineups only record who did play. Real values need a
+      pre-match team-sheet source. See docs/results.md.
       if a suitable data source becomes available.
 ```

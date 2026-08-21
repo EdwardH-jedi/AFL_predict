@@ -167,6 +167,21 @@ local work — the defaults give SQLite, no odds ingestion, and no Discord.
 | `ENSEMBLE_WEIGHT_*` | see `.env.example` | Single source of truth for the blend |
 | `READINESS_*` | see `.env.example` | Live-readiness gate thresholds |
 
+### Network exposure
+
+**The API is unauthenticated.** `make serve` and the systemd unit both bind
+`0.0.0.0:8000`, and there is no auth dependency on any router
+(`api/main.py`). The `/api/tab/*` routes are state-changing: they record and
+settle tracked bets and write `BankrollLog` entries, so anyone who can reach the
+port can corrupt the paper-trading ledger, and with it ROI and CLV history.
+
+That is acceptable on the trusted home LAN this system was built for. It is not
+acceptable on a public network. Before exposing it beyond a trusted subnet, bind
+to `127.0.0.1` and front it with a reverse proxy that authenticates, or put the
+host behind a VPN. No real money is reachable either way — no component holds
+bookmaker credentials or can place a wager — but a corrupted ledger silently
+invalidates the evidence the live-readiness gate depends on.
+
 **Secrets stay in `.env`, which is gitignored.** Do not commit credentials.
 Changing recommendation parameters is not a casual edit — see
 [`recommendation_quality_iteration.md`](recommendation_quality_iteration.md).

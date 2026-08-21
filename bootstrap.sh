@@ -34,6 +34,19 @@ fi
 echo "==> Creating storage directories"
 mkdir -p storage/raw_snapshots storage/model_artifacts
 
+# 7. Build the database schema.
+# Without this the API, pipeline and dashboard all start against an empty
+# database. Alembic is the only supported way to create the schema; do not
+# substitute `make db-init` (see README).
+echo "==> Applying database migrations (alembic upgrade head)"
+# The venv is already activated above, so `python` is the venv interpreter.
+if python -m alembic upgrade head; then
+    echo "    Schema is at head."
+else
+    echo "    !!! Migration failed. Fix DB_URL in .env, then run:"
+    echo "        python -m alembic upgrade head"
+fi
+
 echo ""
 echo "==> Bootstrap complete."
 echo "    Activate your venv: source .venv/bin/activate"

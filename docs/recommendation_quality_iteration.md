@@ -287,12 +287,11 @@ These are issues flagged during Phase 8 that are relevant to recommendation qual
 
 | Issue | Impact | Status |
 |-------|--------|--------|
-| `_load_best_model` selects most-recent model, not best Brier score | Recommendations may come from a suboptimal model | TODO — fix before interpreting recommendation quality |
-| Model class is always `BookmakerBaseline` regardless of what was trained | Recommendations are currently circular (odds-based, not model-based) | TODO — fix before drawing any conclusions |
-| TAB bookmaker availability in Odds API tier unconfirmed | Edge vs. TAB may be computed against a different bookmaker's line | TODO — confirm before live trial |
+| `_load_best_model` selected the most-recent model, not the best Brier score | Recommendations could come from a suboptimal model | **RESOLVED.** It now builds the weighted ensemble from `Settings.ensemble_weights`, and falls back to the lowest-Brier compatible run. |
+| Model class was always `BookmakerBaseline` regardless of what was trained | Recommendations were circular (odds compared back to themselves) | **RESOLVED.** Artifacts load per component, and a run whose stored `n_features` does not match the current schema is skipped rather than silently degraded. |
+| TAB bookmaker availability in Odds API tier unconfirmed | Edge vs. TAB may be computed against a different bookmaker's line | Open — `TAB_BOOKMAKER_CONFIRMED` still gates live readiness. |
 
-**Do not tune the edge threshold or Kelly fraction until issue #2 is resolved.**
-The system is currently recommending based on the bookmaker's own implied probability
-compared back to itself — any apparent edge is artificial.
-
-Resolving these issues is the first iteration task, not parameter tuning.
+The circularity warning that stood here no longer applies: recommendations come
+from trained models, not from the bookmaker's own implied probability. Edge
+threshold and Kelly fraction can now be reasoned about on their merits — subject
+to the evidence rules in the rest of this document.

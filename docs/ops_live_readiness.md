@@ -42,8 +42,9 @@ Complete this checklist in addition to the automated report.
 
 - [ ] Most recent Brier score < 0.22
 - [ ] ECE (expected calibration error) < 0.06
-- [ ] Model selection uses best performer, not just most recent
-  - **TODO**: update `generate_recommendations._load_best_model` to use Brier score
+- [x] Model selection uses best performer, not just most recent
+  - Resolved: `_load_best_model` builds the configured ensemble, else selects the
+    lowest-Brier compatible run.
 - [ ] At least 2 full AFL seasons of training data
 
 ### C. Data pipeline reliability

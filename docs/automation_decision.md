@@ -181,16 +181,17 @@ unreliable (3+ cron failures in a 4-week period).
 
 ## 4. What would actually improve reliability right now
 
-The most impactful reliability improvement available today is not a new automation
-layer — it is resolving the two critical TODOs in `generate_recommendations.py`
-(model selection and loading). Until those are fixed, the pipeline runs reliably
-but produces recommendations from the wrong model. That is a correctness failure,
-not a reliability failure, but it is more damaging to the paper trading record than
-any amount of process automation.
+The two critical TODOs this section was written around — model selection and
+artifact loading in `generate_recommendations.py` — have since been resolved. The
+job now builds the configured ensemble, falls back to the lowest-Brier compatible
+run, and skips artifacts whose feature schema no longer matches. The conclusion
+below is unchanged: added automation is still not the highest-value work.
 
 In order of actual impact on system reliability and operator confidence:
 
-1. **Resolve the critical TODOs** — model selection and loading
+1. **Confirm data quality end to end** — the model now trains and predicts from
+   the intended artifacts, so the binding constraint has moved upstream to
+   coverage and freshness
 2. **Confirm The Odds API TAB bookmaker availability** — verify the right bookmaker
    is being used as the reference for edge calculation
 3. **Systemd for API server** — after 2 stable weeks of paper trading

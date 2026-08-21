@@ -3,9 +3,11 @@
 **Verified run:** 2026-08-19 · Python 3.11.15 · scikit-learn 1.9.0 · XGBoost 3.2.0 ·
 statsmodels 0.14.6 · pandas 2.3.3 · NumPy 2.4.6
 
-Every number on this page was produced by the command in
-[Reproducing this](#reproducing-this) on the date above. Nothing here is carried
-over from an earlier benchmark. Historical figures that are *not* current are
+Every current result on this page was produced by the command in
+[Reproducing this](#reproducing-this) on the date above. The only other figures
+quoted are three superseded tuned-era Brier values under
+"Hyperparameter independence", each labelled as such and used only to show the
+size of a correction. Historical figures that are *not* current are
 kept separately in [`archive/ACCURACY_PLAN.md`](archive/ACCURACY_PLAN.md) and are
 labelled there.
 
@@ -160,8 +162,16 @@ here.
 **The ensemble does not beat its best component.** Blending logistic (0.2056)
 with three weaker models yields 0.2081 — worse than logistic alone, better than
 everything else. Nor does it buy calibration: its ECE (0.0824) sits between
-logistic's (0.0871) and Elo's (0.0762). What it buys is variance reduction, which
-is a defensible reason to keep it but a modest one.
+logistic's (0.0871) and Elo's (0.0762).
+
+It does not buy stability over logistic either. Across the seven folds the
+ensemble's Brier standard deviation is 0.0182 against logistic's 0.0170, so it is
+marginally *more* variable, not less. What blending demonstrably damps is its
+most heavily weighted component: XGBoost swings 0.0368 across folds, the blend
+containing it swings 0.0182. That is the honest case for the ensemble — it
+protects against the worst component, not against the best one. No bootstrap
+confidence intervals were computed for this run (`bootstrap_cis` is empty in the
+artifact), so none of these spreads carry a significance claim.
 
 The weights are configuration (`Settings.ensemble_weights`), not a fitted result,
 and they have deliberately not been optimised against this evaluation — tuning
@@ -178,10 +188,14 @@ weighted blend has lower ECE — averaging calibrated with uncalibrated
 probabilities can move calibration either way. A production-equivalent number
 means running the calibration flow inside each fold, which this run does not do.
 
-**XGBoost underperforms logistic regression.** With ~1,600 training rows and 29
-features, gradient boosting overfits where a linear model does not. Its ECE
-(0.1226) is the worst in the table by a wide margin. This is a sample-size problem, not a
-hyperparameter problem.
+**XGBoost underperforms logistic regression** out of sample: 0.2269 against
+0.2056, the worst ECE in the table (0.1226), and by far the widest fold-to-fold
+swing (Brier SD 0.0368 against logistic's 0.0170).
+
+Overfitting on ~1,600 rows and 29 features is the natural reading, but this
+evaluation cannot establish it. Attributing a cause needs training-set scores,
+learning curves, or a nested tuning experiment, none of which this run produces.
+What is measured is out-of-sample underperformance and instability.
 
 **Poisson is barely a model.** In score mode its GLM regresses on an intercept
 and `is_final` only (`models/poisson_model.py::_fit_score_mode`) — no team

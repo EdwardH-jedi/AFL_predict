@@ -110,8 +110,8 @@ dashboard kept only for reference. Start with the quant dashboard.
 |---|---|---|
 | **Bookmaker consensus** | De-vigged market implied probability | The benchmark to beat. Deliberately *not* in the ensemble — blending the market in suppresses the disagreement the system looks for. |
 | **Elo** | Ratings with home advantage and between-season regression | Low-variance stabiliser. Stateless at inference. |
-| **Logistic regression** | L2-regularised over 29 features | Strongest single model here. Linear generalises better than trees at this sample size. |
-| **XGBoost** | Gradient-boosted trees, early stopping, SHAP | Adds a different error profile to the blend; overfits alone. |
+| **Logistic regression** | L2-regularised over 29 features | Strongest single model here, and the most stable across folds. |
+| **XGBoost** | Gradient-boosted trees, early stopping, SHAP | Weakest of the three trained learners out of sample and by far the most fold-to-fold variance. |
 | **Poisson** | Home/away scoring rates → score-difference distribution | Currently conditioned only on an intercept and finals status, so it predicts the same probability for every regular-season match — a global baseline, not a match-specific model. |
 | **Ensemble** | Weighted average, renormalised | Weights from `Settings.ensemble_weights` — one authoritative source, read by both the recommendation job and the API. |
 
@@ -265,7 +265,7 @@ deployment, and configuration reference:
 ## Testing
 
 ```bash
-make test      # pytest tests/ -v          (338 tests)
+make test      # pytest tests/ -v          (345 tests)
 make lint      # ruff check .
 ```
 
@@ -302,6 +302,11 @@ Known limitations, stated plainly:
   [`docs/assets/README.md`](docs/assets/README.md).
 - The accumulated paper-trading sample is not yet large enough to report CLV or
   realised ROI.
+- **The API has no authentication.** `make serve` binds `0.0.0.0`, and the
+  `/api/tab/*` routes mutate tracked-bet and bankroll records. Anyone who can
+  reach the port can corrupt the paper-trading ledger. No real money is
+  reachable — nothing in this repository can place a wager — but the service is
+  built for a trusted LAN and should not be exposed to a public network as-is.
 - The evaluation is inspectable but not bit-reproducible from a clean clone: the
   feature parquet is gitignored, regenerating it needs live Squiggle data that can
   be retroactively corrected, and `requirements.txt` pins ranges rather than exact
