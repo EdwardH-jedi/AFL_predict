@@ -153,8 +153,9 @@ market's information and add Elo and form on top; logistic lands just short of
 the benchmark. Elo and Poisson do not see odds at all
 (`models/elo_baseline.py`, `models/poisson_model.py`) and sit well behind.
 
-This is a correlation across six models, not a measured effect. No no-odds
-ablation was run, so the size of any "lift from odds" is not established here.
+This is a correlation across six models, not a measured effect. No ablation
+without odds was run, so the size of any "lift from odds" is not established
+here.
 
 **The ensemble does not beat its best component.** Blending logistic (0.2056)
 with three weaker models yields 0.2081 — worse than logistic alone, better than
