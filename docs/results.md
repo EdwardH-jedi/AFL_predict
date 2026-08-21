@@ -79,8 +79,10 @@ agreed with each other.
 
 `--untuned` is the actual fix, and it moves the numbers: Elo's Brier goes from
 0.2225 to 0.2246, XGBoost's from 0.2284 to 0.2269, the ensemble's from 0.2085 to
-0.2081. The conclusion does not change — the market still wins every column, in
-aggregate and in every season.
+0.2081. The conclusion does not change: the market still wins all four metrics in
+aggregate, and still wins Brier and log loss in every season. (Those three
+five-figure values are the superseded tuned-era numbers, quoted here only to show
+the size of the shift.)
 
 The parameter files carry no dataset or fold provenance. If you re-tune, use
 nested walk-forward tuning, or freeze parameters on earlier seasons and keep the
@@ -131,7 +133,8 @@ season. The best model (logistic regression, 0.2056) sits about 3% worse than th
 benchmark (0.1997).
 
 Individual models do edge it out on the two noisier metrics in single seasons —
-accuracy in 2020, 2023, 2024 and 2025 (highest: XGBoost 75.1% vs 73.7% in 2025),
+accuracy in 2020, 2023, 2024 and 2025 (best single figure: XGBoost 75.1% against
+73.7% in 2025; largest margin: logistic +2.8pp in 2023),
 and ECE in 2020, 2022, 2023 and 2024 (Elo repeatedly). On ~200 matches per season
 those are coin-flips, not skill: accuracy discards the probability entirely, and
 ECE over a few bins is unstable at that sample size. Brier and log loss are the
