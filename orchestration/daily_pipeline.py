@@ -68,8 +68,10 @@ settings = get_settings()
 # ---------------------------------------------------------------------------
 # Job registry
 # ---------------------------------------------------------------------------
-# Order matters. hard_dep=True means a failure in this job will cause all
-# subsequent hard_dep jobs to be skipped.
+# Order matters, but ordering alone is not a dependency. `requires` names the
+# upstream jobs a job cannot run without; if any of them did not finish
+# `success`, the job is skipped. `hard_dep` additionally marks membership of the
+# critical chain.
 #
 # NODE_ROLE filtering (set NODE_ROLE in .env):
 #   standalone  — all jobs (default, single-machine)
@@ -86,8 +88,14 @@ _ALL_JOBS: list[JobSpec] = [
     ),
 
     # Ingestion (hard deps — recommendations are meaningless without fresh data)
-    JobSpec(name="ingest_afl", module=ingest_afl, hard_dep=True, can_retry=True),
-    JobSpec(name="ingest_tab_odds", module=ingest_tab_odds, hard_dep=True, can_retry=True),
+    JobSpec(
+        name="ingest_afl", module=ingest_afl, hard_dep=True, can_retry=True,
+        expects_records=True,
+    ),
+    JobSpec(
+        name="ingest_tab_odds", module=ingest_tab_odds, hard_dep=True, can_retry=True,
+        expects_records=True,
+    ),
 
     # Feature build (hard dep — predictions require features)
     JobSpec(name="build_features", module=build_features, hard_dep=True, can_retry=False),
@@ -98,8 +106,18 @@ _ALL_JOBS: list[JobSpec] = [
         module=generate_recommendations,
         hard_dep=False,
         can_retry=False,
+        # Recommendations are only as good as the features and prices behind
+        # them. Running on stale features is worse than producing nothing.
+        requires=("build_features", "ingest_afl", "ingest_tab_odds"),
     ),
-    JobSpec(name="notify_bets", module=notify_bets, hard_dep=False, can_retry=False),
+    JobSpec(
+        name="notify_bets",
+        module=notify_bets,
+        hard_dep=False,
+        can_retry=False,
+        # Never alert on recommendations that were not generated this run.
+        requires=("generate_recommendations",),
+    ),
     JobSpec(name="settle_results", module=settle_results, hard_dep=False, can_retry=False),
 
     # Summary artifact (soft — failure just means no JSON file for today)
@@ -255,8 +273,30 @@ def _execute_jobs(daily_run_id: int) -> list[JobResult]:
     results: list[JobResult] = []
     hard_dep_failed = False
 
+    # job_name -> terminal status, consulted by `requires` below.
+    statuses: dict[str, str] = {}
+
     for spec in DAILY_JOBS:
-        # Check if this job should be skipped
+        # 1. Named upstream dependencies. Anything that did not finish `success`
+        #    (failed, degraded, partial_failure, skipped) blocks this job.
+        unmet = [
+            f"{dep}={statuses.get(dep, 'did-not-run')}"
+            for dep in spec.requires
+            if statuses.get(dep) != "success"
+        ]
+        if unmet:
+            result = JobResult(
+                job_name=spec.name,
+                status="skipped",
+                error_message=f"Skipped: unmet dependencies — {', '.join(unmet)}.",
+            )
+            _persist_job_run(daily_run_id, spec.name, result)
+            results.append(result)
+            statuses[spec.name] = "skipped"
+            logger.error(f"[{spec.name}] SKIPPED — unmet dependencies: {', '.join(unmet)}")
+            continue
+
+        # 2. Critical-chain guard (unchanged behaviour, narrower role).
         if spec.hard_dep and hard_dep_failed:
             result = JobResult(
                 job_name=spec.name,
@@ -265,6 +305,7 @@ def _execute_jobs(daily_run_id: int) -> list[JobResult]:
             )
             _persist_job_run(daily_run_id, spec.name, result)
             results.append(result)
+            statuses[spec.name] = "skipped"
             logger.info(f"[{spec.name}] SKIPPED (hard-dep chain broken)")
             continue
 
@@ -275,6 +316,7 @@ def _execute_jobs(daily_run_id: int) -> list[JobResult]:
         result = run_job_with_retry(spec)
         _persist_job_run(daily_run_id, spec.name, result)
         results.append(result)
+        statuses[spec.name] = result.status
 
         if result.status == "failed" and spec.hard_dep:
             hard_dep_failed = True
