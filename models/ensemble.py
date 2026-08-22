@@ -87,24 +87,50 @@ class TrainableEnsemble(Ensemble):
 
     name = "ensemble"
 
+    def __init__(self, components: list[tuple[BaseModel, float]]) -> None:
+        super().__init__(components)
+        # The canonical roster, normalised once and never mutated. fit() derives
+        # a per-fold active set from this rather than editing it in place.
+        #
+        # Why this matters: BacktestRunner reuses one ensemble instance across
+        # every fold. The previous implementation assigned the survivors back to
+        # self.components, so a component that failed to fit in fold 1 was gone
+        # from folds 2..N permanently — one transient failure silently changed
+        # the model being evaluated for the rest of the run.
+        self._canonical: list[tuple[BaseModel, float]] = list(self.components)
+        # Per-fold audit trail: [{"n_components", "weights"}], appended by fit().
+        self.fold_compositions: list[dict[str, Any]] = []
+
+    @property
+    def canonical_weights(self) -> dict[str, float]:
+        """The full roster's weights, independent of any fold's failures."""
+        return {m.name: w for m, w in self._canonical}
+
     def fit(self, X: pd.DataFrame, y: pd.Series) -> None:
         """
         Fit every component on the fold's training data.
 
-        A component that fails to fit is dropped rather than aborting the whole
-        blend, mirroring how predict_proba() renormalises over the components
-        that actually responded. Without this, one unavailable dependency (e.g.
-        XGBoost missing its OpenMP runtime) would blank out the ensemble row of
-        an entire backtest instead of degrading it to the remaining models.
+        A component that fails to fit is dropped **for this fold only**, then
+        the surviving weights are renormalised so the blend stays a proper
+        average. That mirrors how predict_proba() renormalises over components
+        that actually responded, and keeps one unavailable optional dependency
+        (e.g. XGBoost without its OpenMP runtime) from blanking the ensemble row
+        of an entire backtest.
+
+        The canonical roster is restored at the start of every call, so a
+        failure in one fold cannot leak into the next.
         """
+        # Restore the full roster before each fold — this is the fix.
+        self.components = list(self._canonical)
+
         fitted = []
-        for model, weight in self.components:
+        for model, weight in self._canonical:
             try:
                 model.fit(X, y)
             except Exception as exc:
                 logger.warning(
                     f"TrainableEnsemble.fit(): {model.name} fit failed ({exc}) — "
-                    "dropping it from this fold's blend."
+                    "dropping it from THIS fold's blend only."
                 )
                 continue
             fitted.append((model, weight))
@@ -116,6 +142,16 @@ class TrainableEnsemble(Ensemble):
         total = sum(w for _, w in fitted)
         self.components = [(m, w / total) for m, w in fitted]
         self.weights = {m.name: w for m, w in self.components}
+        self.fold_compositions.append(
+            {"n_components": len(fitted), "weights": dict(self.weights)}
+        )
+        if len(fitted) < len(self._canonical):
+            dropped = sorted({m.name for m, _ in self._canonical} - set(self.weights))
+            logger.warning(
+                f"TrainableEnsemble.fit(): fold ran with {len(fitted)}/"
+                f"{len(self._canonical)} components (dropped: {', '.join(dropped)}). "
+                "The full roster is restored for the next fold."
+            )
         logger.debug(
             f"TrainableEnsemble.fit(): fitted {len(fitted)} component(s) "
             f"on {len(X)} rows — weights {self.weights}."
