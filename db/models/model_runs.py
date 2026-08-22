@@ -33,6 +33,16 @@ class ModelRun(Base):
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # 'pending' | 'completed' | 'failed'
+    # Identifies the training run that produced this model. Every model trained
+    # in one invocation shares a batch id, which is what lets the recommendation
+    # job require ensemble components to come from a single coherent batch
+    # rather than assembling them independently by best score across history.
+    # NULL on runs predating this column: those are not eligible for
+    # batch-coherent assembly.
+    training_batch_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 

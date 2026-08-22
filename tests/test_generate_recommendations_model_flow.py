@@ -71,23 +71,31 @@ def test_load_best_model_fallback_skips_stale_best_brier_run(db_session, monkeyp
     assert model.name == "elo_baseline"
 
 
-def test_try_build_ensemble_uses_first_loaded_component_run_when_no_xgb_or_logistic(
+def test_partial_batch_is_rejected_rather_than_partially_assembled(
     db_session, monkeypatch
 ):
+    """A batch missing a configured component yields no ensemble.
+
+    Previously each component was chosen independently by best Brier, so an
+    ensemble could be assembled from whatever happened to be available. A batch
+    that cannot supply the whole configured blend is now rejected outright and
+    the job falls back to a single model — a partial blend silently reweights
+    itself, which is a different model than the one that was configured.
+    """
     from orchestration.jobs import generate_recommendations as recs
 
     db_session.query(ModelRun).delete()
     db_session.commit()
 
-    elo = _completed_run("elo_baseline", brier_score=0.21)
-    poisson = _completed_run("poisson", brier_score=0.22)
-    db_session.add_all([elo, poisson])
+    # One coherent batch, but only two of the four configured components.
+    db_session.add_all([
+        _completed_run("elo_baseline", brier_score=0.21, training_batch_id="batch-a"),
+        _completed_run("poisson", brier_score=0.22, training_batch_id="batch-a"),
+    ])
     db_session.commit()
 
     monkeypatch.setattr(recs, "_instantiate_model", lambda run: _DummyModel(run.model_name))
-    monkeypatch.setattr(recs, "Ensemble", lambda components: {"components": components})
 
     ensemble, ref_run = recs._try_build_ensemble(db_session)
-
-    assert ensemble is not None
-    assert ref_run.id == poisson.id
+    assert ensemble is None
+    assert ref_run is None

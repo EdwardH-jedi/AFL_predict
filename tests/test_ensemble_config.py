@@ -126,51 +126,33 @@ def test_recommendation_job_has_no_private_weight_table():
     )
 
 
-def test_recommendation_job_builds_ensemble_from_settings_weights(db_session, monkeypatch):
-    """The ensemble builder must consume exactly the configured components."""
+def test_recommendation_job_selects_components_by_configured_names(db_session, monkeypatch):
+    """The batch selector must ask for exactly the configured components.
+
+    Assembly is now batch-coherent: one query filters ModelRun.model_name to the
+    configured set and components are taken from a single training batch, rather
+    than one best-Brier query per component. What must not drift is *which*
+    names are demanded — a typo'd weight key would silently shrink the blend.
+    """
     from orchestration.jobs import generate_recommendations as recs
 
     configured = {"logistic_baseline": 0.4, "xgboost": 0.6}
     monkeypatch.setattr(
-        type(recs.settings),
-        "ensemble_weights",
-        property(lambda self: configured),
+        type(recs.settings), "ensemble_weights", property(lambda self: configured)
     )
 
-    requested: list[str] = []
+    captured: dict = {}
 
-    def fake_query(model):
-        return _FilterCapture(requested)
+    def fake_select(db, required):
+        captured["required"] = set(required)
+        return None, {}
 
-    class _FilterCapture:
-        """Records which model_name each component query asks for."""
+    monkeypatch.setattr(recs, "_select_coherent_batch", fake_select)
 
-        def __init__(self, sink):
-            self._sink = sink
-
-        def filter(self, *criteria, **k):
-            for c in criteria:
-                text = str(c)
-                if "model_name" in text:
-                    self._sink.append(text)
-            return self
-
-        def order_by(self, *a, **k):
-            return self
-
-        def limit(self, *a, **k):
-            return self
-
-        def all(self):
-            return []
-
-    monkeypatch.setattr(db_session, "query", fake_query)
     model, ref = recs._try_build_ensemble(db_session)
 
-    # No runs exist, so no ensemble is built — but exactly the configured
-    # components must have been looked up, and nothing else.
-    assert model is None and ref is None
-    assert len(requested) == len(configured)
+    assert model is None and ref is None, "no qualifying batch -> no ensemble"
+    assert captured["required"] == set(configured)
 
 
 def test_no_positive_weights_falls_back_instead_of_crashing(db_session, monkeypatch):

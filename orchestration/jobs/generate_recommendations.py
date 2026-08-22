@@ -200,26 +200,22 @@ def _try_build_ensemble(db):
         )
         return None, None
 
-    for model_name, weight in weights.items():
-        candidates = (
-            db.query(ModelRun)
-            .filter(
-                ModelRun.status == "completed",
-                ModelRun.model_name == model_name,
-                ModelRun.brier_score.isnot(None),
-            )
-            .order_by(ModelRun.brier_score.asc())
-            .limit(20)
-            .all()
+    batch_id, batch_runs = _select_coherent_batch(db, set(weights))
+    if batch_id is None:
+        logger.warning(
+            "_try_build_ensemble: no training batch provides every configured "
+            "component with a compatible feature schema -- falling back to the "
+            "single best model. Components are never mixed across batches."
         )
+        return None, None
 
-        run = None
-        for candidate in candidates:
-            if not _is_model_run_schema_compatible(candidate):
-                continue
-            run = candidate
-            break
+    logger.info(
+        f"_try_build_ensemble: using training batch {batch_id!r} "
+        f"({len(batch_runs)} components)"
+    )
 
+    for model_name, weight in weights.items():
+        run = batch_runs.get(model_name)
         if run is None:
             logger.debug(f"_try_build_ensemble: no compatible run for {model_name!r} -- skipping")
             continue
@@ -252,6 +248,67 @@ def _try_build_ensemble(db):
     active = [m.name for m, _ in components]
     logger.info(f"_load_best_model: ensemble built from {active} (ref run_id={ref_run.id})")
     return ensemble, ref_run
+
+
+def _select_coherent_batch(db, required: set[str]) -> tuple[str | None, dict]:
+    """Pick one training batch that can supply every configured component.
+
+    Components used to be chosen independently — each model's best-Brier run
+    across all history — which could pair a logistic regression from one
+    training run with an XGBoost from another months later, trained on different
+    data under different code. The weights belonged to a configuration; the
+    components belonged to nothing.
+
+    A batch qualifies only if it provides *every* configured component with a
+    feature schema matching the current one. Among qualifying batches the most
+    recent wins: recency beats score here, because picking the best-scoring
+    batch across history is selection on the same metric the models are judged
+    by. Runs with no `training_batch_id` (produced before batches existed) are
+    not eligible.
+
+    Returns (batch_id, {model_name: ModelRun}) or (None, {}).
+    """
+    rows = (
+        db.query(ModelRun)
+        .filter(
+            ModelRun.status == "completed",
+            ModelRun.training_batch_id.isnot(None),
+            ModelRun.model_name.in_(required),
+        )
+        .order_by(ModelRun.completed_at.desc())
+        .limit(400)
+        .all()
+    )
+
+    batches: dict[str, dict] = {}
+    order: list[str] = []
+    for row in rows:
+        if row.training_batch_id not in batches:
+            batches[row.training_batch_id] = {}
+            order.append(row.training_batch_id)
+        # Keep the first (most recent) run per model within a batch.
+        batches[row.training_batch_id].setdefault(row.model_name, row)
+
+    for batch_id in order:
+        runs = batches[batch_id]
+        missing = required - set(runs)
+        if missing:
+            logger.debug(
+                f"_select_coherent_batch: batch {batch_id!r} missing {sorted(missing)}"
+            )
+            continue
+        incompatible = [
+            name for name, run in runs.items() if not _is_model_run_schema_compatible(run)
+        ]
+        if incompatible:
+            logger.debug(
+                f"_select_coherent_batch: batch {batch_id!r} has stale feature schema "
+                f"for {sorted(incompatible)}"
+            )
+            continue
+        return batch_id, runs
+
+    return None, {}
 
 
 def _select_single_model_run(db, with_brier: bool, order_by):

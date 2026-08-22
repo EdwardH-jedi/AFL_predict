@@ -20,9 +20,7 @@ from __future__ import annotations
 
 import types
 
-import pytest
-
-from orchestration.pipeline_state import JobResult, JobSpec, run_job_with_retry
+from orchestration.pipeline_state import JobSpec, run_job_with_retry
 
 
 def _module(fn):

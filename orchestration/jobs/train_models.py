@@ -39,6 +39,7 @@ CLI usage:
 import json
 import sys
 import time
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -198,6 +199,12 @@ def run() -> None:
         db.add(pipeline_run)
         db.flush()
 
+        # One batch id for every model trained in this invocation. Production
+        # ensemble assembly requires all components to share it, so a blend can
+        # never be stitched together from unrelated training runs.
+        training_batch_id = uuid.uuid4().hex[:16]
+        logger.info(f"train_models: training batch {training_batch_id!r}")
+
         for model in models:
             _train_and_record(
                 db, model,
@@ -206,6 +213,7 @@ def run() -> None:
                 evaluator,
                 X_cal_train=X_cal_train, y_cal_train=y_cal_train,
                 X_cal=X_cal, y_cal=y_cal,
+                training_batch_id=training_batch_id,
             )
 
         duration = time.monotonic() - start
@@ -229,6 +237,7 @@ def _train_and_record(
     y_cal_train: pd.Series | None = None,
     X_cal: pd.DataFrame | None = None,
     y_cal: pd.Series | None = None,
+    training_batch_id: str | None = None,
 ) -> None:
     """Train a single model, evaluate it, and write a ModelRun record.
 
@@ -244,6 +253,7 @@ def _train_and_record(
         model_name=model.name,
         model_version=model.version,
         status="running",
+        training_batch_id=training_batch_id,
     )
     db.add(run_record)
     db.flush()
