@@ -126,6 +126,10 @@ class BacktestRunner:
 
         # Per-model accumulator for window-level results
         model_window_results: dict[str, list[WindowMetrics]] = {m.name: [] for m in models}
+        # Match-level predictions, retained so pooled (non-decomposable) metrics
+        # such as ECE can be computed over all folds at once and independently
+        # re-derived from the saved artifact.
+        prediction_rows: list[dict] = []
 
         for fold_idx, (train_df, test_df) in enumerate(splits):
             fold_label = _fold_label(test_df)
@@ -135,13 +139,28 @@ class BacktestRunner:
             )
 
             for model in models:
-                wm = self._run_fold(model, train_df, test_df, fold_label)
+                wm, fold_rows = self._run_fold(model, train_df, test_df, fold_label)
                 model_window_results[model.name].append(wm)
                 result.window_results.append(wm.to_dict())
+                prediction_rows.extend(fold_rows)
 
-        # Aggregate per-model
+        result.predictions = prediction_rows
+        preds_df = pd.DataFrame(prediction_rows)
+
+        # Aggregate per-model, passing that model's pooled predictions so
+        # pooled_ece is computed over every fold at once rather than averaged
+        # from per-season values (ECE is not decomposable).
         for model in models:
-            agg = aggregate_metrics(model_window_results[model.name])
+            pooled = (
+                preds_df[preds_df["model"] == model.name]
+                if not preds_df.empty
+                else None
+            )
+            agg = aggregate_metrics(model_window_results[model.name], pooled_predictions=pooled)
+            # Record the ensemble's per-fold composition for auditability (§14).
+            comps = getattr(model, "fold_compositions", None)
+            if comps:
+                agg["fold_compositions"] = comps
             result.aggregate_metrics[model.name] = agg
 
         result.print_summary()
@@ -153,8 +172,12 @@ class BacktestRunner:
         train_df: pd.DataFrame,
         test_df: pd.DataFrame,
         fold_label: str,
-    ) -> WindowMetrics:
-        """Run one (train, test) fold for one model. Returns WindowMetrics."""
+    ) -> tuple[WindowMetrics, list[dict]]:
+        """Run one (train, test) fold for one model.
+
+        Returns the fold's WindowMetrics plus one row per prediction, so pooled
+        metrics can be computed across folds and audited from the artifact.
+        """
         # Training requires settled matches only
         train_settled = train_df[train_df["home_win"].notna()].copy()
         if len(train_settled) < 10:
@@ -170,14 +193,14 @@ class BacktestRunner:
             model.fit(X_train, y_train)
         except Exception as exc:
             logger.error(f"[{model.name}] fold {fold_label}: fit() failed — {exc}")
-            return _empty_metrics(model.name, fold_label, len(test_df))
+            return _empty_metrics(model.name, fold_label, len(test_df)), []
 
         # Predict on the full test set (model handles its own NaN logic)
         try:
             preds_df = model.predict_proba(test_df.drop(columns=["home_win"], errors="ignore"))
         except Exception as exc:
             logger.error(f"[{model.name}] fold {fold_label}: predict_proba() failed — {exc}")
-            return _empty_metrics(model.name, fold_label, len(test_df))
+            return _empty_metrics(model.name, fold_label, len(test_df)), []
 
         # Align actuals to predictions
         actuals = (
@@ -219,7 +242,26 @@ class BacktestRunner:
             f"brier={wm.brier_score} ll={wm.log_loss} acc={wm.accuracy} "
             f"bets={wm.n_bets} roi={wm.roi}"
         )
-        return wm
+
+        # One auditable row per prediction. `settled` marks rows that carry an
+        # outcome and therefore contribute to pooled metrics; unsettled rows are
+        # kept so the artifact records what was predicted, not only what scored.
+        season = int(test_df["season"].iloc[0]) if len(test_df) else None
+        fold_rows = [
+            {
+                "model": model.name,
+                "fold_label": fold_label,
+                "season": season,
+                "match_id": int(mid),
+                "y_prob": round(float(prob), 8),
+                "y_true": (int(actual) if pd.notna(actual) else None),
+                "settled": bool(pd.notna(actual)),
+            }
+            for mid, prob, actual in zip(
+                preds_df["match_id"], preds_df["home_win_prob"], actuals.values
+            )
+        ]
+        return wm, fold_rows
 
 
 # ---------------------------------------------------------------------------

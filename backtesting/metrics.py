@@ -61,6 +61,12 @@ class WindowMetrics:
     total_staked: float       # sum of stake_fractions (virtual unit)
     roi: float                # net profit / total_staked (nan if total_staked=0)
 
+    # Raw counts retained so pooled aggregates are exact rather than
+    # back-derived from a rounded rate (see aggregate_metrics).
+    n_bets_settled: int = 0   # bets with a recorded outcome
+    n_bets_won: int = 0       # of those, how many won
+    edge_sum: float = 0.0     # sum of edges over placed bets
+
     def to_dict(self) -> dict:
         return {
             "model_name": self.model_name,
@@ -127,6 +133,9 @@ def compute_metrics(
         ece = round(expected_calibration_error(y_true, y_prob), 6)
 
     # --- Decision metrics (from simulation output) ---
+    n_bets_settled = 0
+    n_bets_won = 0
+    edge_sum = 0.0
     if simulated_bets is None or simulated_bets.empty:
         n_bets = 0
         n_no_bet = n_settled
@@ -141,9 +150,11 @@ def compute_metrics(
         # hit_rate: fraction of bets where the recommended side actually won
         if n_bets > 0 and "won" in simulated_bets.columns:
             settled_bets = simulated_bets.dropna(subset=["won"])
+            n_bets_settled = int(len(settled_bets))
+            n_bets_won = int(settled_bets["won"].astype(bool).sum()) if n_bets_settled else 0
             hit_rate = (
                 round(float(settled_bets["won"].mean()), 6)
-                if len(settled_bets) > 0
+                if n_bets_settled > 0
                 else math.nan
             )
         else:
@@ -151,6 +162,7 @@ def compute_metrics(
 
         # avg_edge
         if n_bets > 0 and "edge" in simulated_bets.columns:
+            edge_sum = float(simulated_bets["edge"].sum())
             avg_edge = round(float(simulated_bets["edge"].mean()), 6)
         else:
             avg_edge = math.nan
@@ -178,6 +190,9 @@ def compute_metrics(
         ece=ece,
         n_bets=n_bets,
         n_no_bet=n_no_bet,
+        n_bets_settled=n_bets_settled,
+        n_bets_won=n_bets_won,
+        edge_sum=edge_sum,
         hit_rate=hit_rate,
         avg_edge=avg_edge,
         total_staked=total_staked,
@@ -185,18 +200,46 @@ def compute_metrics(
     )
 
 
-def aggregate_metrics(window_results: list[WindowMetrics]) -> dict:
+def aggregate_metrics(
+    window_results: list[WindowMetrics],
+    pooled_predictions: pd.DataFrame | None = None,
+    n_bins: int = 10,
+) -> dict:
     """
-    Aggregate per-fold metrics across all folds for one model.
+    Aggregate per-fold metrics into a single summary for one model.
 
-    Computes mean (weighted by n_settled) for probability metrics,
-    and sum-then-divide for ROI.
+    **Which aggregations are exact, and which are not.**
+
+    Brier score, log loss and accuracy are means of per-row quantities, so a
+    fold-mean weighted by `n_settled` is *identical* to computing them over all
+    pooled rows. `_wavg` is exact for those three.
+
+    ECE is not like that. It bins predictions and compares each bin's mean
+    prediction to its empirical rate, so it is **not decomposable**: a weighted
+    average of per-season ECE is a different statistic from ECE over the pooled
+    predictions, and on this dataset the two disagree enough to reverse the
+    calibration ranking. Small per-season samples (~200 matches over 10 bins)
+    also bias each seasonal estimate upward, which the weighted average then
+    carries into the aggregate.
+
+    Both are therefore reported under explicit names and never as bare "ece":
+
+      pooled_ece           ECE over every prediction from every fold at once.
+                           The canonical figure for a global calibration claim.
+                           Requires `pooled_predictions`; None without it.
+      season_weighted_ece  n_settled-weighted mean of per-season ECE. Retained
+                           as a macro/seasonal diagnostic only.
+
+    Decision metrics follow the same rule. `pooled_hit_rate` is total wins over
+    total settled bets; `macro_season_hit_rate` is the unweighted fold mean that
+    earlier versions reported as plain "hit_rate". Both are named explicitly.
 
     Args:
-        window_results: List of WindowMetrics from all folds.
-
-    Returns:
-        Dict with aggregated metric values.
+        window_results:     Per-fold metrics for one model.
+        pooled_predictions: Optional frame with columns `y_true` and `y_prob`
+                            covering every settled prediction the model made
+                            across all folds. Required for pooled_ece.
+        n_bins:             Bin count for pooled ECE (must match per-fold usage).
     """
     if not window_results:
         return {}
@@ -205,9 +248,12 @@ def aggregate_metrics(window_results: list[WindowMetrics]) -> dict:
     total_bets = sum(w.n_bets for w in window_results)
     total_no_bet = sum(w.n_no_bet for w in window_results)
     total_staked_sum = sum(w.total_staked for w in window_results)
+    total_bets_settled = sum(w.n_bets_settled for w in window_results)
+    total_bets_won = sum(w.n_bets_won for w in window_results)
+    total_edge_sum = sum(w.edge_sum for w in window_results)
 
     def _wavg(attr: str) -> float:
-        """Weighted average of a metric by n_settled."""
+        """n_settled-weighted mean. Exact for Brier, log loss and accuracy."""
         vals = [(getattr(w, attr), w.n_settled) for w in window_results
                 if not math.isnan(getattr(w, attr)) and w.n_settled > 0]
         if not vals:
@@ -215,33 +261,59 @@ def aggregate_metrics(window_results: list[WindowMetrics]) -> dict:
         total_w = sum(wt for _, wt in vals)
         return round(sum(v * wt for v, wt in vals) / total_w, 6) if total_w > 0 else math.nan
 
-    def _bet_avg(attr: str) -> float:
-        """Average of a bet metric across non-nan folds."""
+    def _macro(attr: str) -> float:
+        """Unweighted mean across folds. A macro statistic, not a pooled one."""
         vals = [getattr(w, attr) for w in window_results if not math.isnan(getattr(w, attr))]
         return round(float(np.mean(vals)), 6) if vals else math.nan
+
+    # --- Calibration: pooled is canonical, season-weighted is diagnostic ---
+    pooled_ece: float | None = None
+    if pooled_predictions is not None and not pooled_predictions.empty:
+        valid = pooled_predictions.dropna(subset=["y_true", "y_prob"])
+        if len(valid) > 0:
+            pooled_ece = expected_calibration_error(
+                valid["y_true"].values, valid["y_prob"].values, n_bins=n_bins
+            )
+    season_weighted_ece = _wavg("ece")
 
     # Aggregate ROI: total profit / total staked across all folds
     all_roi_nan = all(math.isnan(w.roi) for w in window_results)
     if all_roi_nan or total_staked_sum == 0:
         agg_roi = math.nan
     else:
-        # Re-derive total profit from roi * staked per fold
         profits = [w.roi * w.total_staked for w in window_results
                    if not math.isnan(w.roi) and w.total_staked > 0]
         agg_roi = round(sum(profits) / total_staked_sum, 6) if total_staked_sum > 0 else math.nan
+
+    pooled_hit_rate = (
+        round(total_bets_won / total_bets_settled, 6) if total_bets_settled > 0 else math.nan
+    )
+    pooled_avg_edge = round(total_edge_sum / total_bets, 6) if total_bets > 0 else math.nan
 
     return {
         "model_name": window_results[0].model_name,
         "n_folds": len(window_results),
         "n_settled_total": total_settled,
+
+        # Exact pooled equivalents (mean-of-means weighted by n is identical here)
         "brier_score": _wavg("brier_score"),
         "log_loss": _wavg("log_loss"),
         "accuracy": _wavg("accuracy"),
-        "ece": _wavg("ece"),
+
+        # Calibration — two distinct statistics, never a bare "ece"
+        "pooled_ece": pooled_ece,
+        "season_weighted_ece": season_weighted_ece,
+
+        # Decision metrics — pooled and macro reported side by side
         "n_bets_total": total_bets,
         "n_no_bet_total": total_no_bet,
-        "hit_rate": _bet_avg("hit_rate"),
-        "avg_edge": _bet_avg("avg_edge"),
+        "n_bets_settled_total": total_bets_settled,
+        "n_bets_won_total": total_bets_won,
+        "pooled_hit_rate": pooled_hit_rate,
+        "macro_season_hit_rate": _macro("hit_rate"),
+        "pooled_avg_edge": pooled_avg_edge,
+        "macro_season_avg_edge": _macro("avg_edge"),
+        "edge_sum_total": round(total_edge_sum, 6),
         "total_staked": round(total_staked_sum, 6),
         "roi": agg_roi,
     }
