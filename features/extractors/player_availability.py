@@ -51,8 +51,18 @@ class PlayerAvailabilityExtractor(BaseExtractor):
     Requires a SQLAlchemy Session to query the player_lineups table.
     """
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, allow_unknown_announcement: bool = False) -> None:
+        """
+        Args:
+            db: session.
+            allow_unknown_announcement: admit lineups with a NULL `announced_at`.
+                Off by default. Historical rows carry no announcement time and
+                are derived from who actually played, which is post-match
+                information. Enable only for explicitly retrospective analysis.
+        """
         self._db = db
+        self._allow_unknown_announcement = allow_unknown_announcement
+        self._excluded_not_as_of = 0
 
     def extract(self, matches: list[Match]) -> dict[int, dict]:
         result: dict[int, dict] = {}
@@ -100,8 +110,15 @@ class PlayerAvailabilityExtractor(BaseExtractor):
         """
         Fetch the pre-match lineup for a team, respecting leakage policy.
 
-        If announced_at is NULL (historical data), always include it.
-        If announced_at is set, only include if announced_at < match_time.
+        Only lineups demonstrably announced before kickoff are used:
+        `announced_at` must be present AND earlier than `match_time`.
+
+        A NULL `announced_at` is excluded, not admitted. Historical AFL Tables
+        rows carry no announcement time and are in practice derived from who
+        actually played, which is precisely the post-match information a
+        pre-match feature must not see. Treating unknown as safe was fail-open;
+        this is fail-closed. Pass `allow_unknown_announcement=True` to opt back
+        in for explicitly retrospective analysis.
         """
         query = (
             self._db.query(PlayerLineup)
@@ -109,9 +126,13 @@ class PlayerAvailabilityExtractor(BaseExtractor):
             .filter(PlayerLineup.team_id == team_id)
         )
 
-        # Filter by announcement time if available and match_time is known
-        if match_time is not None:
-            # Include rows where announced_at is NULL (historical) OR before match_time
+        # Fail closed: require a known announcement time strictly before kickoff.
+        if match_time is None:
+            # No kickoff time means the boundary cannot be evaluated at all.
+            self._excluded_not_as_of += 1
+            return None
+
+        if self._allow_unknown_announcement:
             from sqlalchemy import or_
             query = query.filter(
                 or_(
@@ -119,8 +140,16 @@ class PlayerAvailabilityExtractor(BaseExtractor):
                     PlayerLineup.announced_at < match_time,
                 )
             )
+        else:
+            query = query.filter(
+                PlayerLineup.announced_at.isnot(None),
+                PlayerLineup.announced_at < match_time,
+            )
 
-        return query.first()
+        row = query.first()
+        if row is None:
+            self._excluded_not_as_of += 1
+        return row
 
 
 # ---------------------------------------------------------------------------

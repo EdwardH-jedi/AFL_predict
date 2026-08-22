@@ -67,8 +67,21 @@ class WeatherExtractor(BaseExtractor):
     so the model pipeline is not disrupted during backfill.
     """
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, allow_retrospective: bool = False) -> None:
+        """
+        Args:
+            db: session.
+            allow_retrospective: opt in to snapshots whose capture time is at or
+                after kickoff, or unknown. Off by default — such rows are NOT
+                available to a pre-match prediction, so including them silently
+                would make this feature retrospective while still being
+                described as pre-match. Set True only for explicitly
+                retrospective analysis, never for a production or canonical
+                pre-match run.
+        """
         self._db = db
+        self._allow_retrospective = allow_retrospective
+        self._excluded_not_as_of = 0
 
     def extract(self, matches: list[Match]) -> dict[int, dict]:
         result: dict[int, dict] = {}
@@ -80,6 +93,18 @@ class WeatherExtractor(BaseExtractor):
                 .filter(WeatherSnapshot.match_id == match.id)
                 .first()
             )
+
+            # As-of boundary: a snapshot only counts if it demonstrably existed
+            # before kickoff. Fail closed — an unknown capture time is treated
+            # as unavailable rather than assumed safe, because Open-Meteo is
+            # queried for observed conditions and a row fetched after the match
+            # can carry the actual match-day weather.
+            if snap is not None and not self._allow_retrospective:
+                as_of = getattr(snap, "fetched_at", None)
+                if match.match_time is None or as_of is None or as_of >= match.match_time:
+                    self._excluded_not_as_of += 1
+                    result[match.id] = dict(_NULL_FEATURES)
+                    continue
 
             if snap is None or snap.temperature_c is None:
                 result[match.id] = dict(_NULL_FEATURES)
