@@ -195,6 +195,6 @@ PARTIAL: Player availability features exist
       (features/extractors/player_availability.py) but carry no signal: the
       historical collector hard-codes availability to 1.0 with zero absences,
       because retrospective lineups only record who did play. Real values need a
-      pre-match team-sheet source. See docs/results.md.
+      pre-match team-sheet source. See docs/RESULTS.md.
       if a suitable data source becomes available.
 ```

@@ -45,5 +45,5 @@ When the payload is a demo run (`"demo": true`), the banner reads
 `SAMPLE DATA — demo run — remaining panels are placeholder values, not results`,
 which is visible in both screenshots.
 
-Verified performance numbers live in [`../results.md`](../results.md) — that is
+Verified performance numbers live in [`../RESULTS.md`](../RESULTS.md) — that is
 the only place to read this system's actual results.

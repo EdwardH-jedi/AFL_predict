@@ -380,7 +380,7 @@ def _report(payload: dict, train_rows: int, wrote_example: bool = False) -> None
     print("  models regress strong favourites toward the mean, so most of the 'edge'")
     print("  they find sits on longshots where they are simply less confident than")
     print("  the market. One round of 10 matches proves nothing either way; the")
-    print("  full walk-forward evaluation across seasons is in docs/results.md.")
+    print("  full walk-forward evaluation across seasons is in docs/RESULTS.md.")
     print(line)
     print("\n  Wrote:")
     print("    static/quant-dashboard/predictions.json   (dashboard payload)")

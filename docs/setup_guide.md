@@ -206,7 +206,12 @@ Register-ScheduledTask -TaskName "AFL_Pipeline" -Action $action -Trigger $trigge
 
 ## 머신 B — RTX5080 워크스테이션 (NVIDIA)
 
-CUDA를 활용한 GPU 가속 XGBoost 학습 + 개발 환경.
+GPU 가속 XGBoost 학습을 위한 개발 환경 준비 절차.
+
+> **주의:** 현재 코드는 GPU를 사용하지 않는다. `models/xgboost_model.py`는
+> `XGBClassifier`를 생성할 때 `device` 인자를 넘기지 않으며, XGBoost 2.x는
+> 자동으로 GPU를 선택하지 않는다. 아래 절차는 향후 `device="cuda"`를 켤 때를
+> 위한 준비이며, 지금 학습은 CPU에서 실행된다.
 
 ### Step 1: CUDA Toolkit 설치
 

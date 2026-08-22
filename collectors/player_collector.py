@@ -273,7 +273,7 @@ class PlayerCollector:
 
         Consequence: `*_availability_index` and `*_key_players_absent` are
         constant across the whole dataset and contribute nothing to any model.
-        This is stated in docs/results.md rather than left for a reader to
+        This is stated in docs/RESULTS.md rather than left for a reader to
         discover. Making it real needs a pre-match team-sheet source
         (fetch_player_stats on Thursdays), not a change here.
 

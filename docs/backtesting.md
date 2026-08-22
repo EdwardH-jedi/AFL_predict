@@ -101,6 +101,10 @@ on out-of-sample Brier score or log loss is not worth using.
 Expected metrics: best Brier score, best log loss. If another model beats this,
 check for data leakage first.
 
+*These are design expectations, not results. The measured outcome — the benchmark
+does win Brier and log loss in aggregate and in every test season — is in
+[`RESULTS.md`](RESULTS.md) §8.*
+
 ### EloBaseline
 
 Maintains team ELO ratings updated match-by-match from historical results.
@@ -153,7 +157,8 @@ The calibration report groups predicted probabilities into 10 equal-width bins
 and reports the empirical win rate for each. A perfectly calibrated model has
 `actual_fraction ≈ mean_predicted` in every bin.
 
-Example of well-calibrated output:
+Illustrative example of well-calibrated output (synthetic — not a measured
+result; for measured calibration see [`RESULTS.md`](RESULTS.md) §9):
 ```
 [0.40,0.50)  mean_pred=0.4530  actual=0.4480  gap=-0.0050   count=  82
 [0.50,0.60)  mean_pred=0.5490  actual=0.5510  gap=+0.0020   count=  94
@@ -237,21 +242,28 @@ make backtest ARGS="--edge-threshold 0.05"
 make train-models
 ```
 
-### Expected output
+### Example output
+
+The shape of a run. **These figures are illustrative, not measured** — they come
+from an early 3-fold configuration and do not match the current evaluation. For
+the canonical numbers see [`RESULTS.md`](RESULTS.md).
 
 ```
 ==> run_backtest: starting (mode=expanding, min_train_seasons=2, edge_threshold=0.03)
-BacktestRunner: starting expanding-window backtest (min_folds=2, ...)
-BacktestRunner: fold 1/3 — 2022 (train=414, test=198)
-[bookmaker_baseline] fold=2022 brier=0.2301 ll=0.6502 acc=0.5808 bets=24 roi=-0.021
+BacktestRunner: starting expanding-window backtest
+BacktestRunner: fold 1/7 — 2019 (train=411, test=207)
+[bookmaker_baseline] fold=2019 brier=... ll=... acc=... bets=0 roi=nan
 ...
-BacktestResult saved to storage/backtest_results/backtest_abc12345_20250320T073012Z.json
+BacktestResult saved to storage/raw_snapshots/backtest_results/backtest_<id>_<ts>.json
 
            model_name  n_folds  n_settled_total  brier_score  ...  roi
-  bookmaker_baseline        3              594       0.2298  ... -0.018
-       elo_baseline        3              594       0.2401  ...  0.005
-  logistic_baseline        3              594       0.2315  ... -0.022
+   bookmaker_baseline        7             1413       0.199678  ...  NaN
+    logistic_baseline        7             1413       0.205576  ... -0.067
 ```
+
+Note that `bookmaker_baseline` records **zero bets and a null ROI** by
+construction: edge is model probability minus market implied probability, and for
+this model those are the same number, so no selection can clear the threshold.
 
 ---
 

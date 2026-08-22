@@ -18,7 +18,7 @@ CLI usage:
     python -m orchestration.jobs.run_backtest --mode rolling --min-train-seasons 3
     python -m orchestration.jobs.run_backtest --edge-threshold 0.05
 
-    # The form used for every number in docs/results.md:
+    # The form used for every number in docs/RESULTS.md:
     python -m orchestration.jobs.run_backtest --min-season 2017 --max-season 2025 --untuned
 """
 

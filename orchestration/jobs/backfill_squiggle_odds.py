@@ -203,7 +203,7 @@ def _build_snapshot(match: Match, hconfidence: float, source_id: int | None = No
 
     hconfidence is the home team win % as implied by bookmaker consensus
     (source 5, Punters). It is already overround-normalised (home + away = 100%),
-    which means these prices carry NO bookmaker margin — see docs/results.md
+    which means these prices carry NO bookmaker margin — see docs/RESULTS.md
     before treating any simulated return from them as achievable.
 
     source_id records which Squiggle source the value came from. Anything other

@@ -89,8 +89,10 @@ training and inference impute from the same medians. Columns that are entirely
 null are dropped up front, since median imputation has nothing to fill them from;
 individual missing values do **not** drop a row.
 
-Linear, and on this dataset that is a feature. With ~1,600 training rows it
-generalises better than gradient boosting — see [`results.md`](results.md).
+Linear, and on this dataset that is an advantage: it is the strongest single
+model measured and the most stable across folds (Brier SD 0.0170 against
+XGBoost's 0.0368). Whether that is *because* of the ~1,600-row sample size is a
+reading, not a measured result — see [`RESULTS.md`](RESULTS.md) §12.
 
 ### XGBoost
 
@@ -98,8 +100,12 @@ Gradient-boosted trees over the same features, with early stopping and SHAP
 importances available. CPU-only as wired: `XGBClassifier` is constructed without
 a `device` argument, and XGBoost 2.x does not select a GPU on its own, so the
 "auto-detects CUDA" note elsewhere in this repo's history is wrong. Using a GPU
-would mean passing `device="cuda"`. Overfits on this sample size; kept
-because it contributes something different to the blend, not because it wins.
+would mean passing `device="cuda"`.
+
+It underperforms logistic regression out of sample and is the least stable model
+across folds. Overfitting on this sample size is the natural reading but is not
+established by this evaluation — see [`RESULTS.md`](RESULTS.md) §12. It is kept
+because it contributes a different error profile to the blend, not because it wins.
 
 ### Poisson
 
@@ -112,7 +118,7 @@ identity, no form, no market. So every regular-season match receives the same
 pair of scoring rates and the same win probability, and its accuracy comes out
 identical to always picking the home team. The class supports conditioning on
 richer covariates; nothing currently supplies them. Read its row in
-[`results.md`](results.md) as a floor, and do not read the ensemble's Poisson
+[`RESULTS.md`](RESULTS.md) as a floor, and do not read the ensemble's Poisson
 component as contributing match-level information.
 
 ### Calibration
@@ -137,7 +143,7 @@ stale probabilities. That was observed, not assumed: ECE reached ~0.31 under the
 refit flow (recorded in `orchestration/jobs/train_models.py`'s docstring at the
 time the flow was changed). That figure comes from the *training* job's own
 single-split evaluation, not from the walk-forward run in
-[`results.md`](results.md) — which does not measure the calibrated flow at all,
+[`RESULTS.md`](RESULTS.md) — which does not measure the calibrated flow at all,
 and says so. The cost is one season less training data for the base
 model. The benefit is probabilities that mean what they say.
 
@@ -170,7 +176,7 @@ Two properties worth noting:
 
 Weights are configuration, not a fitted result. `models/ensemble.py::optimize_weights`
 can search them against a validation set, but the production blend is not tuned
-against the evaluation folds reported in [`results.md`](results.md) — doing so
+against the evaluation folds reported in [`RESULTS.md`](RESULTS.md) — doing so
 would make that report meaningless.
 
 ---
@@ -225,7 +231,7 @@ never is, so the cap is doing real work.
 
 `backtesting/bootstrap.py` resamples bet sequences for confidence intervals on
 ROI, hit rate and Sharpe. **Point estimates without intervals are not evidence**,
-and the staking figures in [`results.md`](results.md) are labelled accordingly.
+and the staking figures in [`RESULTS.md`](RESULTS.md) are labelled accordingly.
 
 ---
 
@@ -245,6 +251,6 @@ and the staking figures in [`results.md`](results.md) are labelled accordingly.
 
 ---
 
-See [`results.md`](results.md) for the verified numbers,
+See [`RESULTS.md`](RESULTS.md) for the verified numbers,
 [`backtesting.md`](backtesting.md) for runner internals, and
 [`features.md`](features.md) for the extractor-by-extractor reference.

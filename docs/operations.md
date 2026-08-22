@@ -1,7 +1,7 @@
 # Operations
 
 Running the system on a schedule. For a one-off local run see the top-level
-`README.md`; for architecture see [`architecture.md`](architecture.md).
+`README.md`; for architecture see [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 > **Paper trading only.** Nothing in this document places a bet. `notify_bets`
 > posts a Discord message; `tab_tracking` records bets a human already placed
@@ -20,27 +20,42 @@ python -m orchestration.daily_pipeline --triggered-by cron
 `pipeline_runs` row per job, and records the whole run in
 `daily_pipeline_runs`.
 
-| Order | Job | Depends on | Network |
-|---|---|---|---|
-| 1 | `check_data_freshness` | — | no |
-| 2 | `ingest_afl` | — | Squiggle |
-| 3 | `ingest_tab_odds` | — | The Odds API (skipped when `ODDS_API_KEY` is blank) |
-| 4 | `fetch_weather` | fixtures | Open-Meteo |
-| 5 | `build_features` | 2, 3 | no |
-| 6 | `generate_recommendations` | 5 + a trained model | no |
-| 7 | `notify_bets` | 6 | Discord (skipped when `DISCORD_ENABLED=false`) |
-| 8 | `settle_results` | 2 | no |
-| 9 | `generate_daily_summary` | all | no |
-| 10 | `roles/*` audits | all | no |
+`_ALL_JOBS` in that module is the authoritative order — 13 jobs:
+
+| Order | Job | Hard dependency | Retries | Network |
+|---|---|---|---|---|
+| 1 | `check_data_freshness` | no | no | no |
+| 2 | `ingest_afl` | **yes** | yes | Squiggle |
+| 3 | `ingest_tab_odds` | **yes** | yes | The Odds API (skipped when `ODDS_API_KEY` is blank) |
+| 4 | `build_features` | **yes** | no | no |
+| 5 | `generate_recommendations` | no | no | no |
+| 6 | `notify_bets` | no | no | Discord (skipped when `DISCORD_ENABLED=false`) |
+| 7 | `settle_results` | no | no | no |
+| 8 | `generate_daily_summary` | no | no | no |
+| 9–13 | `role_data_steward`, `role_feature_engineer`, `role_model_engineer`, `role_risk_manager`, `role_quant_reviewer` | no | no | no |
+
+`fetch_weather` and `fetch_player_stats` are **not** part of the daily pipeline.
+They are separately scheduled jobs — see the schedule in
+[`../ops/orchestration_24_7.md`](../ops/orchestration_24_7.md).
 
 Behaviour worth knowing:
 
 - **Retries apply to network jobs only.** `PIPELINE_MAX_RETRIES` (default 2)
   with `PIPELINE_RETRY_DELAY_SECONDS` between attempts. Pure-compute jobs are
   not retried — a deterministic failure will not fix itself.
-- **Hard-dependency failures skip downstream jobs.** If `build_features` fails,
-  `generate_recommendations` is skipped rather than run on stale features.
-  Recommendations against yesterday's data are worse than none.
+- **Hard-dependency failure skips later *hard-dep* jobs only — and this is
+  weaker than it sounds.** The guard in `daily_pipeline.py` is
+  `if spec.hard_dep and hard_dep_failed`, so a job is skipped only when *it*
+  is marked `hard_dep=True`. Only `ingest_afl`, `ingest_tab_odds` and
+  `build_features` carry that flag, and nothing hard-dep follows
+  `build_features`.
+
+  **Consequence:** if `build_features` fails, nothing is skipped —
+  `generate_recommendations` still runs, against whatever features were last
+  written. Recommendations against stale data are worse than none, so treat a
+  `build_features` failure as requiring manual intervention rather than assuming
+  the pipeline protected you. Tracked as a known issue in
+  [`PROJECT_STATUS.md`](PROJECT_STATUS.md) §9.
 - **Idempotent.** Safe to re-run the same day. Ingestion upserts; a match result
   is written once and never overwritten. Regenerating recommendations voids
   stale *pending* recommendations, but preserves any that already have a
@@ -125,7 +140,7 @@ database. `NODE_ROLE` in `.env` decides which jobs each machine runs.
 | Machine | `NODE_ROLE` | Uptime | Responsibilities |
 |---|---|---|---|
 | RX 6600 desktop | `collector` | 24/7 | PostgreSQL host, FastAPI :8000, ingestion (fixtures, odds, weather) |
-| RTX 5080 desktop | `predictor` | On demand | Feature build, inference, recommendations, Discord notify, weekly CUDA training |
+| RTX 5080 desktop | `predictor` | On demand | Feature build, inference, recommendations, Discord notify, weekly model training |
 | Single machine | `standalone` | — | Everything (the default) |
 
 `daily_pipeline.py` filters its job list by `NODE_ROLE`, so the same codebase and
@@ -138,9 +153,12 @@ Consequences of the split:
 - **The predictor is optional day to day.** With it off, ingestion and the
   dashboard keep working, but no recommendations, notifications or settlements
   are produced for that day.
-- **The only shared state is PostgreSQL.** Model artifacts and parquet files stay
-  local to the predictor; only `Prediction` and `Recommendation` rows cross over.
-  Restoring the predictor from scratch means retraining, not copying files.
+- **PostgreSQL holds the durable shared state.** `Prediction` and
+  `Recommendation` rows cross between machines through it. Model artifacts
+  (`.pkl`) stay local to the predictor, so restoring it from scratch means
+  retraining rather than copying files. The feature parquet is a file-based
+  exception: `/api/sync/latest-features` can transfer it between machines,
+  authenticated by the `X-Sync-Token` header.
 
 **The canonical schedule, failure modes, and setup steps are in
 [`../ops/orchestration_24_7.md`](../ops/orchestration_24_7.md) and
@@ -169,8 +187,9 @@ local work — the defaults give SQLite, no odds ingestion, and no Discord.
 
 ### Network exposure
 
-**The API is unauthenticated.** `make serve` and the systemd unit both bind
-`0.0.0.0:8000`, and there is no auth dependency on any router
+**Most of the API is unauthenticated.** `make serve` and the systemd unit both
+bind `0.0.0.0:8000`. Only `/api/sync/*` requires an `X-Sync-Token` header
+matching `api_secret_key`; the other eight routers have no auth dependency
 (`api/main.py`). The `/api/tab/*` routes are state-changing: they record and
 settle tracked bets and write `BankrollLog` entries, so anyone who can reach the
 port can corrupt the paper-trading ledger, and with it ROI and CLV history.

@@ -20,31 +20,42 @@ which parts of this dashboard are data and which are placeholder.*
 
 ---
 
-## What it does
+## Overview
 
-- **Collects** AFL fixtures, results, bookmaker odds, weather and player
-  availability from public APIs, snapshotting every raw response before parsing
-- **Builds leakage-safe pre-match features** — Elo, rolling form, momentum,
-  head-to-head, venue, rest, interstate travel, weather, market prices — where
-  every value is provably computable before kickoff
-- **Trains five probabilistic models** — Elo, logistic regression, XGBoost,
-  a Poisson score-distribution baseline, and a bookmaker-consensus benchmark
-- **Calibrates** forecasts with out-of-sample isotonic regression, because stake
-  size depends on the probability being right, not just the ranking
-- **Ensembles** them under a single authoritative weight configuration
-- **Evaluates** with expanding-window walk-forward backtesting, asserting
-  temporal ordering rather than assuming it
-- **Identifies paper-trading value** where the model disagrees with the market,
-  sized by Kelly with a hard cap
-- **Tracks settlement**, bankroll, drawdown, closing-line value and calibration
-  drift over time
-- **Exposes** everything through FastAPI endpoints and a dashboard
-- **Runs on a schedule**, with retries, hard-dependency gating, and per-job audit
-  records
+Forecasting AFL match outcomes as **calibrated probabilities**, and answering
+honestly whether those probabilities are better than the market's.
+
+The difficult part is not fitting a classifier. It is building an evaluation you
+can trust: sports data is a time series where the obvious way to compute "team
+form" silently includes the match being predicted, and where a model that
+appears to beat the closing market is far more likely to be leaking than to be
+skilful.
+
+**The headline result is that the models do not beat the bookmaker consensus.**
+That is the credible outcome for a liquid market, and this project's value is in
+having measured it correctly rather than in having beaten it.
 
 ---
 
-## Architecture
+## What it does
+
+- **Collects** fixtures, results, bookmaker odds, weather and player data from
+  public APIs, snapshotting every raw response before parsing
+- **Builds leakage-safe pre-match features** — Elo, rolling form, momentum,
+  head-to-head, venue, rest, interstate travel, market prices
+- **Trains five probabilistic models** — Elo, logistic regression, XGBoost, a
+  Poisson score baseline, and a bookmaker-consensus benchmark
+- **Calibrates** forecasts with out-of-sample isotonic regression
+- **Ensembles** them under a single authoritative weight configuration
+- **Evaluates** with expanding-window walk-forward backtesting, asserting
+  temporal ordering rather than assuming it
+- **Simulates paper-trading decisions** with Kelly staking under a hard cap
+- **Exposes** results through FastAPI endpoints and a dashboard
+- **Runs on a schedule**, with retries on network steps and per-job audit records
+
+---
+
+## System pipeline
 
 ```text
   Squiggle API · The Odds API · Open-Meteo
@@ -76,104 +87,63 @@ which parts of this dashboard are data and which are placeholder.*
  FastAPI   dashboard   Discord alert   readiness · CLV
 ```
 
-`orchestration/daily_pipeline.py` sequences the jobs, records each run, retries
-network failures, and skips downstream work when a hard dependency fails.
-Details in [`docs/architecture.md`](docs/architecture.md).
+See [Architecture](docs/ARCHITECTURE.md) for component detail and real paths.
 
 ---
 
-## Tech stack
+## Models / methods
 
-| Layer | Technology |
+| Model | Role |
 |---|---|
-| Language | Python 3.11 |
-| API | FastAPI, Uvicorn, Pydantic v2 |
-| Data | PostgreSQL / SQLite, SQLAlchemy 2.0, Alembic, pandas, NumPy, PyArrow |
-| ML | scikit-learn, XGBoost, statsmodels, SciPy, SHAP |
-| HTTP | httpx, requests, tenacity, BeautifulSoup |
-| Frontend | React (in-browser JSX, no build step) · Vite + TypeScript for the secondary app |
-| Quality | pytest, ruff, mypy, GitHub Actions |
-| Ops | Discord webhooks, cron / Windows Task Scheduler, loguru |
+| **Bookmaker consensus** | The benchmark to beat. Deliberately *not* an ensemble component. |
+| **Elo** | Ratings with home advantage and between-season regression. |
+| **Logistic regression** | L2-regularised over 29 features. Strongest single model here. |
+| **XGBoost** | Gradient-boosted trees. Weakest of the three trained learners out of sample. |
+| **Poisson** | Currently conditioned only on an intercept and finals status — a global baseline, not a match-specific model. |
+| **Ensemble** | Weighted average from `Settings.ensemble_weights`, one authoritative source. |
 
-**Which UI is canonical:** `static/quant-dashboard/` — the one screenshotted
-above. It needs no build step and is what `make serve` and `python serve.py`
-present. `frontend/` is a secondary Vite/TypeScript app covering the same
-endpoints; `static/dashboard.html` is a superseded single-file Chart.js
-dashboard kept only for reference. Start with the quant dashboard.
-
-
----
-
-## Models
-
-| Model | Approach | Role |
-|---|---|---|
-| **Bookmaker consensus** | De-vigged market implied probability | The benchmark to beat. Deliberately *not* in the ensemble — blending the market in suppresses the disagreement the system looks for. |
-| **Elo** | Ratings with home advantage and between-season regression | Low-variance stabiliser. Stateless at inference. |
-| **Logistic regression** | L2-regularised over 29 features | Strongest single model here, and the most stable across folds. |
-| **XGBoost** | Gradient-boosted trees, early stopping, SHAP | Weakest of the three trained learners out of sample and by far the most fold-to-fold variance. |
-| **Poisson** | Home/away scoring rates → score-difference distribution | Currently conditioned only on an intercept and finals status, so it predicts the same probability for every regular-season match — a global baseline, not a match-specific model. |
-| **Ensemble** | Weighted average, renormalised | Weights from `Settings.ensemble_weights` — one authoritative source, read by both the recommendation job and the API. |
-
-Full detail — feature-by-feature, calibration flow, leakage argument — in
-[`docs/methodology.md`](docs/methodology.md).
+Feature engineering, the leakage argument, calibration flow and validation design
+are in [Methodology](docs/methodology.md).
 
 ---
 
 ## Evaluation
 
-Expanding-window walk-forward, 7 test folds (2019–2025), **1,413 settled test
-matches**, verified 2026-08-19. Full methodology and caveats:
-[`docs/results.md`](docs/results.md).
+Expanding-window walk-forward, 7 test seasons (2019–2025), **1,413 settled
+matches**, untuned model defaults.
 
 | Model | Brier ↓ | Log loss ↓ | Accuracy ↑ | ECE ↓ |
 |---|---|---|---|---|
 | **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | **0.0678** |
 | Logistic regression | 0.2056 | 0.5961 | 67.7% | 0.0871 |
-| Ensemble (raw-component blend) | 0.2081 | 0.6033 | 67.4% | 0.0824 |
-| Elo | 0.2246 | 0.6382 | 62.1% | 0.0762 |
-| XGBoost | 0.2269 | 0.6649 | 65.8% | 0.1226 |
-| Poisson | 0.2558 | 0.7104 | 56.8% | 0.0926 |
+| Ensemble | 0.2081 | 0.6033 | 67.4% | 0.0824 |
 
 *Brier 0.25 = coin flip. Always picking the home team scores 56.8% on these
-same 1,413 matches — which is also exactly where Poisson lands.*
+matches.*
 
-**No model beats the market.** The best model lands about 3% worse than the
-bookmaker consensus on Brier. The market wins all four metrics in aggregate, and
-wins Brier and log loss in every individual season.
+**No model beats the market.** The benchmark wins all four metrics in aggregate
+and wins Brier and log loss in every one of the seven test seasons. The best
+model is about 3% worse on Brier.
 
-Individual models do edge it out on accuracy or calibration error in single
-seasons, but those are the noisy metrics — on ~200 matches, accuracy throws the
-probability away and ECE over a few bins is unstable. `docs/results.md` lists
-exactly which seasons and why they are not evidence of skill.
-
-Hyperparameters come from each model class's own defaults, not from the tuners:
-the tuners search the same folds these numbers are measured on, so their output
-would be selection leakage. `docs/results.md` records how an earlier, circular
-version of that claim was caught and corrected.
-
-That is the honest result and it is the expected one. AFL head-to-head markets
-are liquid, and a consensus of bookmakers prices them with strictly more
-information than these features carry — including team news that never reaches
-the dataset. A model that *did* beat the closing consensus by a wide margin over
-1,413 matches would be evidence of leakage, not skill.
-
-**Leakage prevention** is enforced in code, not documented as an intention:
-`backtesting/splits.py::_assert_no_leakage` raises `LeakageError` on any fold
-where a training match kicks off after a test match; Elo emits the pre-match
-rating before updating it; every rolling window filters on `match_time`;
-bookmaker features require `snapshot_time < match_time`. Asserted in
-`tests/test_splits.py` and `tests/test_demo.py`.
-
-Simulated staking returns are reported in `docs/results.md` but carry heavy
-caveats — the historical consensus prices have **zero bookmaker margin**, which
-inflates every ROI figure. They are not presented as expected returns.
+Full tables, per-season breakdown, staking simulation, negative results and
+limitations: **[Results](docs/RESULTS.md)**.
 
 ---
 
-## Demo
+## Architecture
 
-No API key, no database, no network, no credentials. About 30 seconds.
+See **[Architecture](docs/ARCHITECTURE.md)**.
+
+## Current status
+
+Research project — tested, evaluation re-runs to a committed artifact, not deployed.
+See **[Project Status](docs/PROJECT_STATUS.md)**.
+
+---
+
+## Running locally
+
+Requires Python 3.11. Nothing below needs a credential.
 
 ```bash
 git clone https://github.com/EdwardH-jedi/AFL_predict.git
@@ -183,141 +153,98 @@ source .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
 
-make demo
+make demo                          # ~30s, no .env, database or network
 ```
 
 `make demo` reads `examples/sample_matches.csv` (636 real completed matches,
 2023–2025), holds out the last home-and-away round, trains the real models on
-everything earlier, blends them with the production ensemble weights, applies the
-real Kelly staking rule, and writes the dashboard payload:
-
-```text
---------------------------------------------------------------------------
-  AFL PREDICT — PORTFOLIO DEMO   (sample data · paper trading only)
---------------------------------------------------------------------------
-  Sample file      examples/sample_matches.csv
-  Trained on       617 completed matches (strictly earlier kickoffs)
-  Holdout slate    2025 round 24 — 10 matches
-  Ensemble weights {'logistic_baseline': 0.3, 'xgboost': 0.35, ...}
---------------------------------------------------------------------------
-  MATCH                                  P(home)  CONF PAPER BET
---------------------------------------------------------------------------
-  Essendon v Carlton                       0.428  MED  $50.00 on home @ 3.846
-  Collingwood v Melbourne                  0.782  HIGH no bet (edge below threshold)
-  ...
---------------------------------------------------------------------------
-  Ensemble on holdout: accuracy 70.0% (7/10)  Brier 0.1559  log loss 0.4758
-  Paper staking: 8 bet(s), $400.00 of a $1000 notional bankroll, 2/8 won, P&L $-12.30
---------------------------------------------------------------------------
-```
-
-Then view it in the browser:
+everything earlier, applies the real Kelly staking rule, and writes the dashboard
+payload. Then:
 
 ```bash
-python serve.py      # http://localhost:8080
+python serve.py                    # http://localhost:8080
 ```
 
-The dashboard shows a `SAMPLE DATA` banner for demo payloads. Ten matches cannot
-evaluate a model — [`docs/results.md`](docs/results.md) can.
-
-> The demo replays completed matches as if they were upcoming. It is clearly
-> labelled as sample data everywhere it appears and never claims to be live.
-
----
-
-## Full development setup
-
-Requires Python 3.11.
+For the full stack:
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements-dev.txt
-
-cp .env.example .env               # defaults are local-only: SQLite, no keys
+cp .env.example .env               # local-only defaults: SQLite, no keys
 python -m alembic upgrade head     # build the schema — do this before anything else
+make serve                         # FastAPI on :8000
 ```
 
-Nothing above needs a credential. `ODDS_API_KEY` and Discord settings are
-optional; blank values disable those jobs and the rest of the pipeline still runs.
-
-`alembic upgrade head` is the only supported way to create the schema. `make
-db-init` (`create_all`) exists for throwaway inspection and must not be mixed
-with Alembic on the same database.
-
-Then, with network access:
-
-```bash
-make ingest-afl ARGS="--season 2025"   # fixtures and results from Squiggle (free, no key)
-make build-features                    # feature matrix → parquet + DB
-make train-models                      # train, calibrate, record ModelRun rows
-make backtest                          # walk-forward evaluation
-make serve                             # FastAPI on :8000
-```
-
-`make help` lists every target. Scheduled operation, the dual-machine
-deployment, and configuration reference:
-[`docs/operations.md`](docs/operations.md).
+`alembic upgrade head` is the only supported way to create the schema.
+`make help` lists every target. Scheduled operation, the dual-machine deployment
+and configuration reference: [Operations](docs/operations.md).
 
 ---
 
-## Testing
+## Reproducing the evaluation
+
+Needs network access to the Squiggle API (free, no key); about 5 minutes.
+
+```bash
+python -m alembic upgrade head          # required before ingestion
+for y in 2017 2018 2019 2020 2021 2022 2023 2024 2025; do
+  python -m orchestration.jobs.ingest_afl --season $y
+done
+python -m orchestration.jobs.backfill_squiggle_odds
+python -m orchestration.jobs.build_features
+python -m orchestration.jobs.run_backtest --min-season 2017 --max-season 2025 --untuned
+```
+
+`--untuned` is not optional for publishable numbers: the tuners search the same
+folds that get reported. The exact artifact behind every published figure is
+committed as [`examples/backtest_2026-08-19.json`](examples/backtest_2026-08-19.json).
+
+Testing:
 
 ```bash
 make test      # pytest tests/ -v          (345 tests)
 make lint      # ruff check .
 ```
 
-```bash
-pytest tests/ -q
-python -m pytest tests/test_alembic_fresh_db.py -v   # migrations on a fresh DB
-python -m demo.run_demo                              # demo end to end
-```
+---
 
-CI runs all of the above on Python 3.11 for every push and pull request, with no
-credentials configured, and fails if the demo modifies a tracked file.
+## Repository structure
+
+```text
+collectors/      ingestion: collect → parse → validate → transform → upsert
+features/        extractors + DatasetBuilder → one row per match
+models/          Elo, logistic, XGBoost, Poisson, bookmaker baseline, ensemble
+backtesting/     walk-forward splits, metrics, staking simulation, artifacts
+evaluation/      readiness gate, CLV tracker, scoring
+orchestration/   daily pipeline and jobs
+api/             FastAPI service (9 routers)
+db/              SQLAlchemy models + Alembic migrations
+static/          canonical dashboard (quant-dashboard/)
+frontend/        secondary Vite/React app
+demo/            credential-free portfolio demo
+examples/        bundled sample data + committed result artifact
+docs/            documentation (see below)
+ops/             machine-specific scheduling scripts and runbooks
+tests/           pytest suite
+```
 
 ---
 
-## Project status
+## Limitations
 
-**Portfolio release / research system.** Ingestion, feature engineering,
-modelling, calibration, walk-forward evaluation, paper recommendation, the API
-and scheduled operation are implemented and tested. Results are freshly verified
-and reported honestly, including the finding that the models do not beat the
-market.
+- **The models do not beat the bookmaker consensus.**
+- Historical data only; no live or forward-tested period has been measured.
+- Simulated ROI uses margin-free consensus prices, so it is structurally
+  optimistic and is not evidence of profitability.
+- No bootstrap confidence intervals for the canonical run — no result carries a
+  significance claim.
+- Player-availability and weather features are constant or null and contribute nothing.
+- **Eight of nine API routers have no authentication** (only `/api/sync/*` checks
+  a shared-secret header), and `make serve` binds `0.0.0.0`; the `/api/tab/*`
+  routes mutate the paper-trading ledger. Safe on a trusted LAN only.
+- Evaluation is inspectable but not bit-reproducible from a clean clone.
+- The static dashboard is a design prototype; unfed panels show placeholder values.
 
-Known limitations, stated plainly:
-
-- No historical weather was collected, so weather features are null throughout
-  the evaluation and contribute nothing to the reported results.
-- Player availability features are constant, not merely approximate: every row
-  is hard-coded to 1.0 with zero absences, so they contribute nothing to any
-  result. Real values need a pre-match team-sheet source.
-- The historical odds feed is a market consensus with no bookmaker margin, which
-  makes simulated ROI structurally optimistic and CLV uncomputable on that data.
-- The static dashboard is a design prototype: panels the data layer does not
-  populate still display placeholder values. See
-  [`docs/assets/README.md`](docs/assets/README.md).
-- The accumulated paper-trading sample is not yet large enough to report CLV or
-  realised ROI.
-- **The API has no authentication.** `make serve` binds `0.0.0.0`, and the
-  `/api/tab/*` routes mutate tracked-bet and bankroll records. Anyone who can
-  reach the port can corrupt the paper-trading ledger. No real money is
-  reachable — nothing in this repository can place a wager — but the service is
-  built for a trusted LAN and should not be exposed to a public network as-is.
-- The evaluation is inspectable but not bit-reproducible from a clean clone: the
-  feature parquet is gitignored, regenerating it needs live Squiggle data that can
-  be retroactively corrected, and `requirements.txt` pins ranges rather than exact
-  versions. The exact result artifact is committed
-  ([`examples/backtest_2026-08-19.json`](examples/backtest_2026-08-19.json)) so
-  every reported number can be checked against its source.
-
-Exploratory work on LLM-generated match previews is **out of scope for this
-release**. No fine-tuning, LLM, or narrative-generation code exists in this
-repository. The design notes are archived in
-[`docs/archive/`](docs/archive/README.md) as a record of exploration.
+Full list with detail: [Results §14](docs/RESULTS.md#14-limitations) and
+[Project Status §9](docs/PROJECT_STATUS.md#9-known-issues).
 
 ---
 
@@ -325,11 +252,13 @@ repository. The design notes are archived in
 
 | Document | Contents |
 |---|---|
-| [`docs/architecture.md`](docs/architecture.md) | Components, data flow, model artifact lifecycle |
-| [`docs/methodology.md`](docs/methodology.md) | Features, leakage prevention, calibration, validation, metrics |
-| [`docs/results.md`](docs/results.md) | Verified evaluation results and caveats |
-| [`docs/operations.md`](docs/operations.md) | Scheduling, dual-machine deployment, configuration, runbooks |
-| [`docs/archive/`](docs/archive/README.md) | Historical plans and superseded designs |
+| [Project Status](docs/PROJECT_STATUS.md) | What exists, what works, validation results, known issues |
+| [Results](docs/RESULTS.md) | Measured evaluation evidence, negative results, verified and unsupported claims |
+| [Architecture](docs/ARCHITECTURE.md) | Components, data flow, engineering decisions |
+| [Portfolio Facts](docs/PORTFOLIO_FACTS.md) | Claims verified as safe for external use |
+| [Methodology](docs/methodology.md) | Features, leakage prevention, calibration, validation |
+| [Operations](docs/operations.md) | Scheduling, dual-machine deployment, configuration |
+| [docs/archive/](docs/archive/README.md) | Historical plans — not current specifications |
 
 ---
 
@@ -345,7 +274,7 @@ repository. The design notes are archived in
   support a restricted live trial. A `ready` verdict authorises nothing; there is
   no mechanism in this codebase to act on it.
 - Betting carries real financial risk. Nothing here is financial advice, and the
-  measured results above are a poor case for wagering money.
+  measured results are a poor case for wagering money.
 
 ---
 
