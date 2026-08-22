@@ -28,8 +28,10 @@ import sys
 import time
 from pathlib import Path
 
+import pandas as pd
 from loguru import logger
 
+from backtesting.provenance import build_manifest, sha256_file
 from backtesting.runner import BacktestRunner
 from config.settings import get_settings
 from models.bookmaker_baseline import BookmakerBaseline
@@ -52,6 +54,9 @@ def run(
     min_season: int | None = None,
     max_season: int | None = None,
     untuned: bool = False,
+    features_path: "Path | None" = None,
+    expect_sha256: str | None = None,
+    allow_fresh_input: bool = False,
 ) -> None:
     """
     Run the full walk-forward backtest for all baseline models plus the ensemble.
@@ -91,10 +96,12 @@ def run(
     if max_kelly_fraction is None:
         max_kelly_fraction = settings.max_kelly_fraction
 
-    df = _load_latest_features()
+    df, resolved_input = _resolve_features(features_path, expect_sha256, allow_fresh_input)
     if df is None or df.empty:
         logger.error("run_backtest: no feature data. Run build_features first.")
         return
+    input_columns = list(df.columns)
+    input_rows = len(df)
 
     df = _filter_seasons(df, min_season=min_season, max_season=max_season)
     if df.empty:
@@ -153,6 +160,33 @@ def run(
     )
 
     result = runner.run(df, models)
+
+    # --- Reproducibility manifest (§2) -------------------------------------
+    # Records what produced these numbers: code state, input identity, runtime
+    # versions, and the exact evaluation configuration.
+    seasons = sorted(int(x) for x in df["season"].unique())
+    ensemble_model = next((m for m in models if m.name == "ensemble"), None)
+    result.provenance = build_manifest(
+        input_path=resolved_input,
+        n_rows=input_rows,
+        columns=input_columns,
+        cli_args=sys.argv[1:],
+        evaluation={
+            "mode": mode,
+            "min_train_seasons": min_train_seasons,
+            "edge_threshold": edge_threshold,
+            "max_kelly_fraction": max_kelly_fraction,
+            "min_season": min_season,
+            "max_season": max_season,
+            "seasons_in_scope": seasons,
+            "test_folds": [str(s) for s in seasons[min_train_seasons:]],
+            "untuned": untuned,
+            "input_checksum_verified": bool(expect_sha256),
+            "ece_n_bins": 10,
+        },
+        models=_model_provenance(models, untuned, elo_params, xgb_params, ensemble_model),
+        market=_market_provenance(df),
+    )
 
     # Save artifact
     path = result.save(BACKTEST_DIR)
@@ -214,6 +248,78 @@ def _make_xgb(params: dict | None) -> XGBoostModel:
         n_estimators=int(params["n_estimators"]),
         subsample=params["subsample"],
     )
+
+
+def _model_provenance(models, untuned, elo_params, xgb_params, ensemble_model) -> dict:
+    """Per-model configuration, including calibration state (§8).
+
+    `calibration: "raw"` is the important field. The walk-forward run fits raw
+    components; production wraps logistic and XGBoost in CalibratedModel before
+    blending. Labelling every model explicitly stops the two being conflated in
+    downstream copy.
+    """
+    seeded = {"logistic_baseline": 42, "xgboost": 42}
+    entry: dict[str, dict] = {}
+    for m in models:
+        entry[m.name] = {
+            # Every model in this run is fitted raw. Nothing here is calibrated.
+            "calibration": "raw",
+            "hyperparameter_source": "constructor_defaults" if untuned else "tuner_artifact",
+            "random_state": seeded.get(m.name),
+        }
+    if "elo_baseline" in entry:
+        entry["elo_baseline"]["params"] = elo_params or {
+            "k_factor": 30.0, "home_advantage": 60.0, "season_regression": 0.3,
+        }
+    if "xgboost" in entry:
+        entry["xgboost"]["params"] = xgb_params or {
+            "max_depth": 4, "learning_rate": 0.05, "n_estimators": 300, "subsample": 0.8,
+        }
+    if ensemble_model is not None:
+        entry["ensemble"]["weights"] = getattr(
+            ensemble_model, "canonical_weights", settings.ensemble_weights
+        )
+        entry["ensemble"]["components"] = sorted(
+            getattr(ensemble_model, "canonical_weights", settings.ensemble_weights)
+        )
+    return entry
+
+
+def _market_provenance(df) -> dict:
+    """Provenance for the bookmaker proxy (§12).
+
+    Naming matters here. These are normalised market-consensus probabilities
+    from Squiggle's Punters feed, not closing lines and not tradeable odds — the
+    implied probabilities sum to exactly 1.0, which no priced market does.
+    """
+    have = "bm_home_implied_prob" in df.columns
+    covered = int(df["bm_home_implied_prob"].notna().sum()) if have else 0
+    overround = (
+        sorted({round(float(x), 6) for x in df["bm_overround"].dropna().unique()})[:5]
+        if "bm_overround" in df.columns else []
+    )
+    return {
+        "name": "normalized Punters market-consensus proxy",
+        "source": "Squiggle tips API",
+        "source_id": 5,
+        "fallback_source_id": 1,
+        "fallback_label": "historical_model",
+        "is_closing_line": False,
+        "is_tradeable_price": False,
+        "margin_removed": True,
+        "observed_overround_values": overround,
+        "timestamp_semantics": (
+            "synthetic: the feed carries no capture time, so each snapshot is "
+            "stamped 2h before kickoff to satisfy snapshot_time < match_time"
+        ),
+        "rows_with_market_probability": covered,
+        "rows_total": int(len(df)),
+        "transformations": [
+            "hconfidence (home win %) / 100 -> home implied probability",
+            "away implied probability = 1 - home",
+            "decimal odds back-derived as 1/p (no margin re-applied)",
+        ],
+    }
 
 
 def _filter_seasons(df, min_season: int | None, max_season: int | None):
@@ -288,18 +394,82 @@ def _load_json_params(path: Path, defaults: dict) -> dict:
         return defaults
 
 
-def _load_latest_features():
-    """Load the most recently written features parquet file."""
-    import pandas as pd
-    files = sorted(FEATURES_DIR.glob("features*.parquet"), key=lambda p: p.stat().st_mtime)
-    if not files:
-        logger.error(f"run_backtest: no parquet files found in {FEATURES_DIR}")
-        return None
-    path = files[-1]
-    logger.info(f"run_backtest: loading features from {path}")
-    df = pd.read_parquet(path)
-    logger.info(f"run_backtest: loaded {len(df)} rows × {len(df.columns)} columns")
-    return df
+class InputContractError(RuntimeError):
+    """The evaluation input is not the dataset the caller asked for."""
+
+
+def _resolve_features(
+    features_path: Path | None,
+    expect_sha256: str | None,
+    allow_fresh: bool,
+) -> tuple["pd.DataFrame | None", Path | None]:
+    """Resolve the evaluation input under an explicit contract.
+
+    Two distinct operations, deliberately not conflated:
+
+      CANONICAL REPRODUCTION — an explicit ``--features`` path whose SHA-256
+        matches ``--expect-sha256``. Any mismatch is fatal: a file can be
+        replaced while keeping its name, and silently scoring a different
+        dataset under the canonical label is the failure mode this guards.
+
+      FRESH REBUILD — ``--allow-fresh-input`` selects the newest parquet by
+        mtime. Convenient for development, non-deterministic by construction,
+        and never valid for a published number.
+
+    Selecting by mtime with no checksum is not reproduction, so it is opt-in.
+    """
+    if features_path is None:
+        if not allow_fresh:
+            logger.error(
+                "run_backtest: no --features given. Pass an explicit path (plus "
+                "--expect-sha256 for canonical reproduction), or --allow-fresh-input "
+                "to accept the newest parquet by mtime for a non-canonical run."
+            )
+            return None, None
+        candidates = sorted(
+            FEATURES_DIR.glob("features*.parquet"), key=lambda q: q.stat().st_mtime
+        )
+        if not candidates:
+            logger.error(f"run_backtest: no parquet files found in {FEATURES_DIR}")
+            return None, None
+        features_path = candidates[-1]
+        logger.warning(
+            f"run_backtest: FRESH REBUILD — selected {features_path.name} by mtime. "
+            "Results are not canonical and must not be published as such."
+        )
+
+    features_path = Path(features_path)
+    if not features_path.exists():
+        logger.error(f"run_backtest: features file not found: {features_path}")
+        return None, None
+
+    actual_sha = sha256_file(features_path)
+    if expect_sha256:
+        if actual_sha != expect_sha256:
+            raise InputContractError(
+                "Evaluation input checksum mismatch — refusing to run.\n"
+                f"  file     : {features_path}\n"
+                f"  expected : {expect_sha256}\n"
+                f"  actual   : {actual_sha}\n"
+                "The file at this path is not the canonical dataset. Re-fetch it, or "
+                "pass --allow-fresh-input to run against it as a non-canonical rebuild."
+            )
+        logger.info(
+            "run_backtest: CANONICAL REPRODUCTION — input sha256 verified "
+            f"{actual_sha[:16]}…"
+        )
+    else:
+        logger.warning(
+            f"run_backtest: no --expect-sha256 given; input sha256 is {actual_sha}. "
+            "Record it to make this run reproducible."
+        )
+
+    df = pd.read_parquet(features_path)
+    logger.info(
+        f"run_backtest: loaded {len(df)} rows × {len(df.columns)} columns "
+        f"from {features_path.name}"
+    )
+    return df, features_path
 
 
 def _parse_args() -> argparse.Namespace:
@@ -334,6 +504,28 @@ def _parse_args() -> argparse.Namespace:
         help="Drop seasons after this year (e.g. exclude an in-progress season)."
     )
     p.add_argument(
+        "--features", type=Path, default=None, dest="features_path",
+        help=(
+            "Explicit path to the evaluation feature parquet. Required unless "
+            "--allow-fresh-input is given. Canonical reproduction always names its input."
+        )
+    )
+    p.add_argument(
+        "--expect-sha256", type=str, default=None, dest="expect_sha256",
+        help=(
+            "Expected SHA-256 of --features. Mismatch aborts the run: a file can be "
+            "replaced while keeping its name, and scoring a different dataset under "
+            "the canonical label is exactly what this prevents."
+        )
+    )
+    p.add_argument(
+        "--allow-fresh-input", action="store_true", dest="allow_fresh_input",
+        help=(
+            "FRESH REBUILD: accept the newest parquet by mtime with no checksum. "
+            "Non-deterministic; never valid for a published number."
+        )
+    )
+    p.add_argument(
         "--untuned", action="store_true",
         help=(
             "Ignore *_best_params.json and use model constructor defaults. Required "
@@ -355,6 +547,9 @@ if __name__ == "__main__":
             min_season=args.min_season,
             max_season=args.max_season,
             untuned=args.untuned,
+            features_path=args.features_path,
+            expect_sha256=args.expect_sha256,
+            allow_fresh_input=args.allow_fresh_input,
         )
     except Exception:
         logger.exception("run_backtest: unhandled error")

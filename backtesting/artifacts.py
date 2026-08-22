@@ -45,6 +45,37 @@ def _json_safe(value):
     return value
 
 
+ARTIFACT_SCHEMA_VERSION = 2
+
+# Probabilities are stored to 6 decimal places. Well beyond what a 10-bin ECE or
+# a Brier score resolves, and it keeps the artifact small enough to commit.
+_PROB_DP = 6
+
+
+def _to_columnar(rows: list[dict]) -> dict[str, list]:
+    """Row-oriented -> dict of equal-length columns."""
+    if not rows:
+        return {}
+    keys = list(rows[0])
+    out: dict[str, list] = {k: [r.get(k) for r in rows] for k in keys}
+    if "y_prob" in out:
+        out["y_prob"] = [
+            (round(v, _PROB_DP) if v is not None else None) for v in out["y_prob"]
+        ]
+    return out
+
+
+def _from_columnar(payload) -> list[dict]:
+    """Columnar -> row-oriented. Tolerates an already row-oriented payload."""
+    if not payload:
+        return []
+    if isinstance(payload, list):
+        return payload
+    keys = list(payload)
+    n = len(payload[keys[0]])
+    return [{k: payload[k][i] for k in keys} for i in range(n)]
+
+
 @dataclass
 class BacktestResult:
     """
@@ -73,6 +104,17 @@ class BacktestResult:
     assumptions: list[str] = field(default_factory=list)
     # Bootstrap CIs per model — populated by compute_bootstrap_cis()
     bootstrap_cis: dict[str, dict] = field(default_factory=dict)
+    # Match-level predictions: one row per (model, match). Makes pooled,
+    # non-decomposable metrics (ECE) independently re-derivable from the
+    # artifact rather than having to be taken on trust.
+    #
+    # Held row-oriented in memory but serialised columnar (dict of equal-length
+    # lists). Repeating six keys across ~8.5k rows costs about a megabyte of
+    # duplicated field names for no information; columnar is ~4x smaller and
+    # loads straight into a DataFrame.
+    predictions: list[dict] = field(default_factory=list)
+    # Reproducibility manifest — code, input, runtime and evaluation provenance.
+    provenance: dict = field(default_factory=dict)
 
     # ---------------------------------------------------------------------------
     # Factory
@@ -114,7 +156,13 @@ class BacktestResult:
             # allow_nan=False: Python's default emits bare NaN/Infinity, which is
             # not valid JSON and is rejected by strict parsers. _json_safe maps
             # every non-finite metric to null first, so this never raises.
-            json.dump(_json_safe(self.to_dict()), f, indent=2, default=str, allow_nan=False)
+            json.dump(
+                _json_safe(self.to_dict()),
+                f,
+                indent=2,
+                default=str,
+                allow_nan=False,
+            )
         logger.info(f"BacktestResult saved to {path}")
         return path
 
@@ -156,17 +204,47 @@ class BacktestResult:
 
     def to_dict(self) -> dict:
         return {
+            "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
             "run_id": self.run_id,
             "run_at": self.run_at,
             "mode": self.mode,
             "min_train_seasons": self.min_train_seasons,
             "n_folds": self.n_folds,
             "models_evaluated": self.models_evaluated,
+            "provenance": self.provenance,
             "window_results": self.window_results,
             "aggregate_metrics": self.aggregate_metrics,
             "assumptions": self.assumptions,
             "bootstrap_cis": self.bootstrap_cis,
+            "predictions": _to_columnar(self.predictions),
         }
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> BacktestResult:
+        """Rehydrate an artifact, refusing schema versions we cannot read.
+
+        Schema v1 artifacts predate match-level predictions and the provenance
+        manifest, and reported a single ambiguous `ece` key that was in fact
+        season-weighted. They cannot be silently upgraded — the pooled figure is
+        not recoverable from v1 data — so loading one is an explicit error
+        rather than a partial read.
+        """
+        version = payload.get("artifact_schema_version", 1)
+        if version != ARTIFACT_SCHEMA_VERSION:
+            raise ValueError(
+                f"Unsupported artifact_schema_version {version!r}; this build reads "
+                f"v{ARTIFACT_SCHEMA_VERSION}. v1 artifacts carry a season-weighted "
+                "'ece' with no match-level predictions, so pooled calibration cannot "
+                "be recovered from them — regenerate the artifact instead."
+            )
+        known = {
+            "run_id", "run_at", "mode", "min_train_seasons", "n_folds",
+            "models_evaluated", "window_results", "aggregate_metrics",
+            "assumptions", "bootstrap_cis", "predictions", "provenance",
+        }
+        kwargs = {k: v for k, v in payload.items() if k in known}
+        kwargs["predictions"] = _from_columnar(payload.get("predictions"))
+        return cls(**kwargs)
 
     # ---------------------------------------------------------------------------
     # Summary
