@@ -125,7 +125,7 @@ All commands run from the repository root inside the project virtualenv, on
 | Test collection | `pytest tests/ --collect-only -q` | 345 tests |
 | Fresh-DB migration | `python -m pytest tests/test_alembic_fresh_db.py -v` | **Pass** — 1 passed |
 | Dashboard semantics | `pytest tests/test_dashboard_edge_semantics.py -q` | **Pass** — 7 passed |
-| Backtest smoke / metric generation | `python -m orchestration.jobs.run_backtest --min-season 2017 --max-season 2025 --untuned` | **Pass** — reproduces `examples/backtest_2026-08-19.json` exactly |
+| Backtest smoke / metric generation | `python -m orchestration.jobs.run_backtest --min-season 2017 --max-season 2025 --untuned` | **Pass** — reproduces `examples/backtest_canonical.json` exactly |
 | Demo | `make demo` | **Pass** — runs with no `.env`, database or network |
 | Typecheck | `python -m mypy .` | **Fail** — 49 errors in 16 files. Configured but never enforced; not in CI and no Make target. |
 | CI | `.github/workflows/ci.yml` | Runs lint, tests, fresh-DB migration, demo, and a clean-tree gate on Python 3.11. Does **not** run mypy. |
@@ -142,7 +142,7 @@ The one skipped test is skipped by design (`CRITICAL_TODOS` is empty, so the
 - **External downloads required** to reproduce the evaluation from scratch: yes — steps 1–3 of the reproduction sequence in `RESULTS.md` §13 need network access to Squiggle.
 - **Credentials required:** none for the core research path. `ODDS_API_KEY` (The Odds API) and Discord tokens are optional; blank values disable those jobs and everything else still runs.
 - **Committed sample data:** `examples/sample_matches.csv` — 636 completed matches (2023–2025) with the full pre-match feature set, frozen from the pipeline. Enough to run `make demo` offline.
-- **Committed evidence:** `examples/backtest_2026-08-19.json` — the exact artifact behind every number in `RESULTS.md`.
+- **Committed evidence:** `examples/backtest_canonical.json` — the exact artifact behind every number in `RESULTS.md`.
 
 ---
 
@@ -221,6 +221,6 @@ The one skipped test is skipped by design (`CRITICAL_TODOS` is empty, so the
 | Test status | 344 passed, 1 skipped; CI green on push and PR. |
 | Reproducibility | Evaluation reproduces exactly from the local feature parquet; **not** bit-reproducible from a clean clone (§7, `RESULTS.md` §13). |
 | Documentation | Four canonical docs (`PROJECT_STATUS`, `RESULTS`, `ARCHITECTURE`, `PORTFOLIO_FACTS`) plus subsystem deep-dives; historical plans archived under `docs/archive/` with a README stating they are not current specifications. |
-| Metric provenance | Every number in `RESULTS.md` traces to `examples/backtest_2026-08-19.json`, which is committed. Verified programmatically. |
+| Metric provenance | Every number in `RESULTS.md` traces to `examples/backtest_canonical.json`, which is committed and embeds the match-level predictions behind each figure. Pooled metrics are recomputable from the artifact; a CI validator does so and fails on tampering. |
 | Secrets | None tracked. `.env` gitignored; `.env.example` holds blank/placeholder values only. Scanned across the release range. |
 | Misleading claims | Audited. The headline result is that the models do **not** beat the bookmaker; unsupported claims are listed explicitly in `RESULTS.md` §16. |

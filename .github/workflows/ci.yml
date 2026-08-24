@@ -43,10 +43,13 @@ jobs:
             requirements.txt
             requirements-dev.txt
 
-      - name: Install dependencies
+      - name: Install dependencies (locked)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          # requirements.lock pins exact versions. A scikit-learn or XGBoost
+          # release can move a metric, so CI installs the same set the canonical
+          # evaluation was produced with.
+          pip install -r requirements.lock
 
       - name: Lint (ruff)
         run: ruff check .
@@ -56,6 +59,19 @@ jobs:
 
       - name: Fresh-database migration smoke test
         run: python -m pytest tests/test_alembic_fresh_db.py -v
+
+      # Runs the real evaluation path over a small committed fixture. CI cannot
+      # reproduce the canonical artifact — that needs a gitignored 2,454-row
+      # parquet and a live upstream — so this deliberately does not claim to.
+      # See docs/RESULTS.md for the canonical reproduction command.
+      - name: Scientific regression (frozen fixture)
+        run: python -m pytest tests/test_scientific_regression.py tests/test_calibration_aggregation.py -v
+
+      - name: Artifact schema and provenance validation
+        run: python -m scripts.validate_artifact examples/backtest_canonical.json
+
+      - name: Static typing (mypy)
+        run: mypy --no-incremental orchestration/ backtesting/ models/ features/ config/
 
       # Proves the headline command in the README works from a clean checkout
       # with no .env file, no database, and no network egress needed.

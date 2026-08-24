@@ -4,7 +4,7 @@
 
 > Only repository-verified facts safe for external use belong here.
 > Every number traces to [`RESULTS.md`](RESULTS.md) and the committed artifact
-> `examples/backtest_2026-08-19.json`. Every capability claim traces to
+> `examples/backtest_canonical.json`. Every capability claim traces to
 > [`PROJECT_STATUS.md`](PROJECT_STATUS.md).
 
 ---
@@ -131,21 +131,29 @@ filtering, cron / Task Scheduler wrappers, Discord alerting, GitHub Actions CI.
 
 ## 9. Verified results
 
-From `examples/backtest_2026-08-19.json` — expanding-window walk-forward, 7 test
+From `examples/backtest_canonical.json` — expanding-window walk-forward, 7 test
 seasons (2019–2025), 1,413 settled matches, untuned model defaults.
 
 | Model | Brier ↓ | Log loss ↓ | Accuracy ↑ | ECE ↓ |
 |---|---|---|---|---|
-| **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | **0.0678** |
-| Logistic regression | 0.2056 | 0.5961 | 67.7% | 0.0871 |
-| Ensemble | 0.2081 | 0.6033 | 67.4% | 0.0824 |
-| Elo | 0.2246 | 0.6382 | 62.1% | 0.0762 |
-| XGBoost | 0.2269 | 0.6649 | 65.8% | 0.1226 |
+| **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | 0.0311 |
+| Logistic regression | 0.2056 | 0.5961 | 67.7% | 0.0437 |
+| Ensemble | 0.2081 | 0.6033 | 67.4% | **0.0218** |
+| Elo | 0.2246 | 0.6382 | 62.1% | 0.0523 |
+| XGBoost | 0.2269 | 0.6649 | 65.8% | 0.0878 |
 | Poisson | 0.2558 | 0.7104 | 56.8% | 0.0926 |
 
-**Headline: the models do not beat the market.** The benchmark wins all four
-metrics in aggregate and wins Brier and log loss in every one of the seven test
-seasons. The best model is ~3% worse on Brier.
+*ECE column is pooled ECE. Season-weighted ECE ranks differently and is
+published alongside it in [Results §9](RESULTS.md#9-calibration).*
+
+**Headline: the models do not beat the market on forecast accuracy.** The
+benchmark wins Brier, log loss and accuracy in aggregate, and wins Brier and log
+loss in every one of the seven test seasons. The best model is ~3% worse on
+Brier.
+
+Calibration is the exception: on pooled ECE the ensemble (0.0218) is better
+calibrated than the market (0.0311). The ordering is bin-sensitive (holds at
+5–20 bins, reverses at 25), so it is suggestive rather than established.
 
 That is the credible outcome for a liquid market, and the project's value is in
 having measured it correctly rather than in having beaten it.
@@ -180,8 +188,17 @@ having measured it correctly rather than in having beaten it.
    mutation-verified regression tests.
 
 5. **Reproducible research artifacts.** Every published number traces to a
-   committed JSON artifact and is verified against it programmatically, rather
-   than being copied by hand from an old report.
+   committed JSON artifact that embeds the match-level predictions behind it, so
+   pooled metrics can be recomputed from the artifact rather than trusted. A CI
+   validator re-derives them and fails on tampering.
+
+6. **A non-decomposable metric aggregated wrongly.** Aggregate ECE was a
+   season-weighted mean of per-season ECE. Brier and log loss decompose that way;
+   ECE does not, because it bins predictions and compares each bin's mean to its
+   empirical rate. Correcting it reversed the calibration ranking — the ensemble,
+   not the market, is best calibrated on the pooled figure. Both metrics are now
+   published under explicit names, and the bin-sensitivity of the result is
+   reported rather than hidden.
 
 ---
 
@@ -246,8 +263,9 @@ Each sentence is intended to survive skeptical technical review.
 - ❌ "Profitable betting system" / "positive ROI strategy" — simulated on margin-free prices, no confidence intervals, no transaction costs.
 - ❌ "Production betting system" / "automated betting" — it is research software and places no bets.
 - ❌ "Deployed" / "in production" — it runs locally and on a private LAN.
-- ❌ "Well-calibrated model" unqualified — the benchmark is better calibrated than every model.
-- ❌ "The ensemble improves accuracy, calibration or stability" — measured false on all three.
+- ❌ "Well-calibrated model" unqualified — which model leads depends on whether pooled or season-weighted ECE is quoted; always name the metric.
+- ❌ "Our ensemble is better calibrated than the bookmaker" as settled fact — true at 5–20 ECE bins, false at 25.
+- ❌ "The ensemble improves accuracy or stability" — measured false on both. (Calibration is the exception and is supported on pooled ECE.)
 - ❌ "Statistically significant" — no confidence intervals were computed.
 - ❌ "Real-time" / "live predictions" — batch, and no live period has been measured.
 - ❌ Any accuracy figure quoted without its benchmark (68.6% market vs 67.7% best model).

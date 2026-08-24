@@ -3,7 +3,7 @@
 **Last verified:** 2026-08-21
 **Evaluation run:** 2026-08-19T08:28:38Z
 **Documented at commit:** `a700ecd`
-**Canonical artifact:** [`../examples/backtest_2026-08-19.json`](../examples/backtest_2026-08-19.json)
+**Canonical artifact:** [`../examples/backtest_canonical.json`](../examples/backtest_canonical.json)
 
 Every current result on this page is transcribed from that artifact and can be
 checked against it. The only other figures quoted are three superseded tuned-era
@@ -160,16 +160,27 @@ destroy a Kelly-sized bankroll.
 python -m orchestration.jobs.run_backtest --min-season 2017 --max-season 2025 --untuned
 ```
 
-| Model | Brier ↓ | Log loss ↓ | Accuracy ↑ | ECE ↓ |
-|---|---|---|---|---|
-| **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | **0.0678** |
-| Logistic regression | 0.2056 | 0.5961 | 67.7% | 0.0871 |
-| Ensemble (raw-component blend) | 0.2081 | 0.6033 | 67.4% | 0.0824 |
-| Elo | 0.2246 | 0.6382 | 62.1% | 0.0762 |
-| XGBoost | 0.2269 | 0.6649 | 65.8% | 0.1226 |
-| Poisson (global baseline) | 0.2558 | 0.7104 | 56.8% | 0.0926 |
+| Model | Brier ↓ | Log loss ↓ | Accuracy ↑ | Pooled ECE ↓ | Season-weighted ECE |
+|---|---|---|---|---|---|
+| **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | 0.0311 | **0.0678** |
+| Logistic regression | 0.2056 | 0.5961 | 67.7% | 0.0437 | 0.0871 |
+| Ensemble (raw-component blend) | 0.2081 | 0.6033 | 67.4% | **0.0218** | 0.0824 |
+| Elo | 0.2246 | 0.6382 | 62.1% | 0.0523 | 0.0762 |
+| XGBoost | 0.2269 | 0.6649 | 65.8% | 0.0878 | 0.1226 |
+| Poisson (global baseline) | 0.2558 | 0.7104 | 56.8% | 0.0926 | 0.0926 |
 
-*n = 1,413 settled test matches across 7 folds.*
+*n = 1,413 settled test matches across 7 folds. Bold marks the best value in each
+column.*
+
+**Two calibration columns, because ECE is not decomposable.** Brier, log loss and
+accuracy are means of per-row quantities, so a fold-mean weighted by n_settled is
+exactly the pooled value. ECE bins predictions and compares each bin's mean
+prediction to its empirical rate, so the weighted mean of per-season ECE is a
+*different statistic* from ECE over the pooled predictions — and here the two
+rank the models differently. **Pooled ECE is the canonical figure** for a global
+calibration statement; season-weighted is retained as a seasonal diagnostic.
+Per-season ECE over ~200 matches in 10 bins is also biased upward, which the
+weighted average carries into the aggregate.
 
 ---
 
@@ -188,7 +199,9 @@ Brier score per test season:
 | 2025 | 213 | **0.1763** | 0.1786 | 0.1815 | 0.2039 | 0.1765 | 0.2620 |
 
 2020 is the COVID season: 160 matches, shortened quarters, disrupted venues and
-travel. Treat it as an outlier rather than a data point.
+travel. It is included in every aggregate on this page and is not excluded from
+any headline. It is flagged because the conditions differed, not to discount it —
+and the market still wins Brier and log loss there, as it does in every season.
 
 ### Tuned vs untuned
 
@@ -221,9 +234,18 @@ The conclusion did not change.
 
 Stated precisely, because the distinction matters:
 
-> **The models do not beat the bookmaker consensus.**
-> The benchmark wins **all four metrics in aggregate**, and wins **Brier and log
-> loss in every one of the seven test seasons**.
+> **The models do not beat the bookmaker consensus on forecast accuracy.**
+> The benchmark wins **Brier, log loss and accuracy in aggregate**, and wins
+> **Brier and log loss in every one of the seven test seasons**.
+>
+> **Calibration is the exception.** On pooled ECE the ensemble (0.0218) is better
+> calibrated than the market (0.0311). See §9 — the gap is real at the canonical
+> bin count but bin-sensitive, so it is suggestive rather than established.
+
+An earlier version of this page claimed the benchmark won *all four* aggregate
+metrics. That was an artefact of reporting season-weighted ECE as though it were
+the pooled figure; correcting the metric reversed the calibration ranking. The
+Brier and log-loss conclusion is unchanged.
 
 Where individual models do edge ahead, in single seasons only:
 
@@ -245,19 +267,49 @@ aggregate result is unambiguous; the per-season exceptions are variance.
 
 Reported separately from classification accuracy, because they diverge here.
 
-| Model | ECE ↓ | Accuracy ↑ |
-|---|---|---|
-| Bookmaker | **0.0678** | **68.6%** |
-| Elo | 0.0762 | 62.1% |
-| Ensemble | 0.0824 | 67.4% |
-| Logistic | 0.0871 | 67.7% |
-| Poisson | 0.0926 | 56.8% |
-| XGBoost | 0.1226 | 65.8% |
+| Model | Pooled ECE ↓ | Season-weighted ECE | Accuracy ↑ |
+|---|---|---|---|
+| **Ensemble** | **0.0218** | 0.0824 | 67.4% |
+| Bookmaker | 0.0311 | **0.0678** | **68.6%** |
+| Logistic | 0.0437 | 0.0871 | 67.7% |
+| Elo | 0.0523 | 0.0762 | 62.1% |
+| XGBoost | 0.0878 | 0.1226 | 65.8% |
+| Poisson | 0.0926 | 0.0926 | 56.8% |
 
-Elo has the second-best calibration while having the second-*worst* accuracy —
-a direct demonstration that the two must not be conflated. XGBoost is the clearest
-counter-example in the other direction: mid-table accuracy, worst calibration by
-a wide margin.
+The two rankings disagree, and that disagreement is the finding:
+
+```
+pooled           ensemble < bookmaker < logistic < elo < xgboost < poisson
+season-weighted  bookmaker < elo < ensemble < logistic < xgboost/poisson
+```
+
+**Pooled is the one to use for a global claim.** Season-weighted averages a
+statistic that does not average — and it is computed from per-season estimates
+each built on ~200 matches spread over 10 bins, where ECE is biased upward.
+Poisson is the tell: it predicts a single constant probability, so every
+prediction lands in one bin and pooling changes nothing (0.0926 either way).
+Every model whose predictions spread across bins moves substantially.
+
+**Bin sensitivity.** ECE depends on bin count, so the ensemble-vs-market result
+was checked across bin counts rather than reported from one:
+
+| Bins | Ensemble | Bookmaker | Ensemble better? |
+|---|---|---|---|
+| 5 | 0.0194 | 0.0215 | yes |
+| 10 *(canonical)* | 0.0218 | 0.0311 | yes |
+| 15 | 0.0280 | 0.0369 | yes |
+| 20 | 0.0433 | 0.0436 | yes (marginal) |
+| 25 | 0.0482 | 0.0436 | **no** |
+
+At 25 bins, 1,413 predictions give ~56 per bin and the estimate becomes noise.
+So: the ensemble is better calibrated than the market at every bin count from 5
+to 20 and worse at 25. Treat the ensemble-vs-market calibration gap as
+**suggestive, not established**. The ensemble beating every *fitted* model is
+robust across all bin counts tested.
+
+Accuracy and calibration diverge sharply: Elo is 4th on pooled ECE while 5th on
+accuracy, and the ensemble is best-calibrated while 3rd on accuracy. XGBoost is
+the clearest counter-example — mid-table accuracy, second-worst calibration.
 
 **The production ensemble's calibration is not measured here.**
 `generate_recommendations` wraps logistic and XGBoost in `CalibratedModel`
@@ -336,8 +388,13 @@ Recorded deliberately. These are the findings that did not go the desired way.
    containing it swings 0.0182. It protects against the worst component, not the
    best one.
 
-4. **Nor does the blend buy calibration.** Its ECE (0.0824) sits between
-   logistic's (0.0871) and Elo's (0.0762).
+4. **Calibration is the one place the blend does help** — a correction to an
+   earlier negative result on this page. Measured against pooled ECE the
+   ensemble is the best-calibrated model in the study (0.0218), ahead of every
+   fitted component and of the market (0.0311). The earlier "the blend does not
+   buy calibration" was computed from season-weighted ECE and was wrong. It
+   remains true that the blend does not improve Brier, log loss, accuracy or
+   fold-to-fold variance, and the margin over the market is bin-sensitive (§9).
 
 5. **XGBoost underperforms logistic regression** out of sample: 0.2269 vs 0.2056,
    the worst ECE in the table, and by far the widest fold-to-fold swing. This
@@ -395,23 +452,61 @@ Kept separate from measurement on purpose.
   natural reading, but this evaluation cannot establish it. Attributing a cause
   needs training-set scores, learning curves, or a nested tuning experiment,
   none of which this run produces.
-- **Why the ensemble is still kept.** Not for accuracy or calibration, both of
-  which it loses to logistic. It bounds the damage from its worst component,
-  which matters when component quality can drift between retrains.
+- **Why the ensemble is kept.** Not for accuracy, which it loses to logistic,
+  and not for stability. It is the best-calibrated model on pooled ECE, and it
+  bounds the damage from its worst component — which matters when component
+  quality can drift between retrains.
 
 ---
 
 ## 13. Reproducibility
 
+Two distinct operations, deliberately not conflated:
+
+**CANONICAL REPRODUCTION** — re-derive the published numbers from the exact
+input they were computed from. The input is named and checksummed; a mismatch
+aborts.
+
+```bash
+pip install -r requirements.lock          # exact pinned versions
+python -m orchestration.jobs.run_backtest \
+    --features storage/raw_snapshots/features/features_20260819T072811Z.parquet \
+    --expect-sha256 f018a265ece9c94d838b64b9fe50dc4175adb366a1cb02d0a85345af1c819ea6 \
+    --min-season 2017 --max-season 2025 --untuned
+```
+
+**FRESH REBUILD** — rebuild the dataset from live upstream and score it. Useful,
+but *not* reproduction: Squiggle can retroactively correct historical records, so
+the input is not guaranteed identical. Requires `--allow-fresh-input`, which
+warns that the result is non-canonical.
+
 | Field | Value |
 |---|---|
-| Commit | `a700ecd` |
-| Evaluation run | 2026-08-19T08:28:38Z |
+| Documented at commit | `f6989cb` |
+| Evaluation run | 2026-08-22T05:52:40Z |
+| Input SHA-256 | `f018a265ece9c94d838b64b9fe50dc41…` |
+| Input rows × columns | 2454 × 62 |
+| Input schema SHA-256 | `60c400540bd3e087e622edbe9ec3a3f8…` |
 | Python | 3.11.15 |
 | Libraries | scikit-learn 1.9.0, XGBoost 3.2.0, statsmodels 0.14.6, pandas 2.3.3, NumPy 2.4.6, SciPy 1.17.1 |
+| Dependency lock | `requirements.lock` (221 pinned packages) |
 | Seeds | `random_state=42` (logistic, XGBoost); Elo and Poisson deterministic |
 | Splits | By calendar season — no sampling |
-| Artifact | `examples/backtest_2026-08-19.json` |
+| Artifact | `examples/backtest_canonical.json` (schema v2) |
+
+Every field above is recorded *inside* the artifact under `provenance`, including
+whether the working tree was clean when it was produced. The artifact also embeds
+the 8,550 match-level predictions behind the metrics, so pooled ECE and Brier can
+be recomputed from it rather than taken on trust —
+`python -m scripts.validate_artifact examples/backtest_canonical.json` does exactly
+that and runs in CI.
+
+**What is not guaranteed.** The feature parquet is gitignored, so a clean clone
+cannot run the canonical command without first rebuilding or obtaining that file.
+Clean-clone *bit* reproducibility does not exist. What does exist: the artifact is
+self-auditable, the input is identified by checksum rather than by filename, and
+the environment is pinned. Committing the parquet (~264 KB) or publishing it with
+its checksum would close the gap and has not been done.
 
 Full regeneration (needs network to the Squiggle API — free, no key; ~5 minutes):
 
@@ -479,7 +574,9 @@ Safe to reuse as written.
 - Temporal leakage is prevented by an assertion that raises on violation, not by convention, and is covered by tests.
 - Reported metrics use untuned model defaults; tuned parameters are excluded because the tuners search the reported folds.
 - Odds provenance was audited: 0 model-estimate fallbacks in 1,845 games across 2017–2025.
-- Calibration is reported separately from accuracy, and the two diverge (Elo: 2nd-best ECE, 2nd-worst accuracy).
+- Calibration is reported separately from accuracy under two explicitly named metrics, and the two diverge: the ensemble is best on pooled ECE while 3rd on accuracy.
+- Pooled and season-weighted ECE rank the models differently, because ECE is not decomposable; the pooled figure is used for global claims and both are published.
+- On pooled ECE the ensemble (0.0218) is better calibrated than every fitted component, at every bin count tested from 5 to 25.
 
 ## 16. Unsupported claims
 
@@ -488,8 +585,9 @@ Current evidence does **not** establish these. Do not use them.
 - ❌ "Beats the bookmaker" — in any framing. The benchmark wins in aggregate and on Brier/log loss in every season.
 - ❌ "Beats the bookmaker on some metrics" as a headline — true only in isolated seasons on the two noisiest metrics, and misleading as a summary.
 - ❌ "Profitable" / "positive ROI strategy" — simulated on margin-free prices, no confidence intervals, no transaction costs, and the positive-ROI models are the worst forecasters.
-- ❌ "Well calibrated" as an unqualified claim — the benchmark is better calibrated than every model.
-- ❌ "The ensemble improves accuracy / calibration / stability over its best component" — measured false on all three.
+- ❌ "Well calibrated" as an unqualified claim — calibration quality depends on which ECE is quoted, and the market is better calibrated than every model on the season-weighted figure.
+- ❌ "The ensemble improves accuracy or stability over its best component" — measured false on both. (Calibration is the exception: on pooled ECE it does improve, and that claim is supported — see §9.)
+- ❌ "The ensemble is better calibrated than the market" as a settled fact — true at 5–20 bins, false at 25. Suggestive, not established.
 - ❌ "XGBoost overfits because of sample size" — a plausible reading, not a measured result.
 - ❌ Any claim about live or forward performance — none has been tested.
 - ❌ Any claim of statistical significance — no confidence intervals were computed.

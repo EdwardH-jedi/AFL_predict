@@ -8,7 +8,7 @@ forecast, and nothing in this directory is used by the production pipeline.
 | `sample_matches.csv` | 636 completed AFL matches (seasons 2023–2025) with the full pre-match feature set. Input to `make demo`. |
 | `sample_predictions.json` | The `predictions.json` payload the static dashboard fetches, as produced by one demo run. |
 | `sample_daily_summary.json` | The artifact shape `orchestration/jobs/generate_daily_summary.py` writes each day, as produced by one demo run. |
-| `backtest_2026-08-19.json` | The verified walk-forward backtest artifact behind every table in [`../docs/RESULTS.md`](../docs/RESULTS.md). Committed because `storage/raw_snapshots/` is gitignored, so a reviewer could not otherwise check the reported numbers against their source. Not demo output — regenerate it with the commands in that document. |
+| `backtest_canonical.json` | The verified walk-forward backtest artifact behind every table in [`../docs/RESULTS.md`](../docs/RESULTS.md). Committed because `storage/raw_snapshots/` is gitignored, so a reviewer could not otherwise check the reported numbers against their source. Not demo output — regenerate it with the commands in that document. |
 
 ## Provenance of `sample_matches.csv`
 

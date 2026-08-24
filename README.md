@@ -112,18 +112,26 @@ are in [Methodology](docs/methodology.md).
 Expanding-window walk-forward, 7 test seasons (2019–2025), **1,413 settled
 matches**, untuned model defaults.
 
-| Model | Brier ↓ | Log loss ↓ | Accuracy ↑ | ECE ↓ |
+| Model | Brier ↓ | Log loss ↓ | Accuracy ↑ | Pooled ECE ↓ |
 |---|---|---|---|---|
-| **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | **0.0678** |
-| Logistic regression | 0.2056 | 0.5961 | 67.7% | 0.0871 |
-| Ensemble | 0.2081 | 0.6033 | 67.4% | 0.0824 |
+| **Bookmaker consensus** (benchmark) | **0.1997** | **0.5811** | **68.6%** | 0.0311 |
+| Logistic regression | 0.2056 | 0.5961 | 67.7% | 0.0437 |
+| Ensemble | 0.2081 | 0.6033 | 67.4% | **0.0218** |
 
 *Brier 0.25 = coin flip. Always picking the home team scores 56.8% on these
 matches.*
 
-**No model beats the market.** The benchmark wins all four metrics in aggregate
-and wins Brier and log loss in every one of the seven test seasons. The best
-model is about 3% worse on Brier.
+**No model beats the market on forecast accuracy.** The benchmark wins Brier,
+log loss and accuracy in aggregate, and wins Brier and log loss in every one of
+the seven test seasons. The best model is about 3% worse on Brier.
+
+**Calibration is the one exception**, and it only became visible after fixing a
+metric bug: the aggregate ECE was a season-weighted average of per-season ECE,
+which is not the same statistic as ECE over the pooled predictions, because ECE
+does not decompose. Corrected, the ensemble (0.0218) is better calibrated than
+the market (0.0311). That ordering holds from 5 to 20 bins and reverses at 25,
+so it is suggestive rather than established. Both metrics are published in
+[Results §9](docs/RESULTS.md#9-calibration).
 
 Full tables, per-season breakdown, staking simulation, negative results and
 limitations: **[Results](docs/RESULTS.md)**.
@@ -195,7 +203,7 @@ python -m orchestration.jobs.run_backtest --min-season 2017 --max-season 2025 --
 
 `--untuned` is not optional for publishable numbers: the tuners search the same
 folds that get reported. The exact artifact behind every published figure is
-committed as [`examples/backtest_2026-08-19.json`](examples/backtest_2026-08-19.json).
+committed as [`examples/backtest_canonical.json`](examples/backtest_canonical.json).
 
 Testing:
 
