@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -111,7 +112,7 @@ def _build_models() -> list:
     from models.logistic_baseline import LogisticBaseline
     from models.poisson_model import PoissonModel
 
-    factories: dict[str, callable] = {
+    factories: dict[str, Callable[[], object]] = {
         "logistic_baseline": LogisticBaseline,
         "poisson": PoissonModel,
         "elo_baseline": EloBaseline,
@@ -126,8 +127,8 @@ def _build_models() -> list:
     except Exception as exc:  # pragma: no cover - environment dependent
         print(f"[warn] XGBoost unavailable ({type(exc).__name__}) — running without it.")
 
-    components = []
-    skipped = []
+    components: list[tuple[object, float]] = []
+    skipped: list[str] = []
     for name, weight in get_settings().ensemble_weights.items():
         factory = factories.get(name)
         if factory is None:
@@ -187,7 +188,7 @@ def _recommend(preds: pd.DataFrame, holdout: pd.DataFrame) -> pd.DataFrame:
         return bets
 
     actuals = holdout.set_index("match_id")["home_win"].reindex(preds["match_id"])
-    result_map = {
+    result_map: dict[int, int | None] = {
         int(mid): int(hw) for mid, hw in zip(holdout["match_id"], holdout["home_win"])
     }
     return settle_bets(bets, actuals, match_id_to_result=result_map)

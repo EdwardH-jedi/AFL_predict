@@ -68,6 +68,9 @@ def run(seasons: list[int] | None = None, dry_run: bool = False) -> None:
         matches_by_ext_id: dict[str, Match] = {
             m.external_id: m
             for m in db.query(Match).filter(Match.season.in_(target_seasons)).all()
+            # external_id is nullable on the model; a match without one cannot be
+            # keyed and is skipped rather than inserted under a None key.
+            if m.external_id is not None
         }
         logger.info(
             f"backfill_squiggle_odds: {len(matches_by_ext_id)} DB matches "
@@ -220,6 +223,10 @@ def _build_snapshot(match: Match, hconfidence: float, source_id: int | None = No
 
     # Snapshot time: 2 hours before kickoff so BookmakerExtractor picks it up
     match_time = match.match_time
+    if match_time is None:
+        raise ValueError(
+            f"match {match.id} has no match_time; cannot derive a pre-match snapshot time"
+        )
     if match_time.tzinfo is None:
         match_time = match_time.replace(tzinfo=UTC)
     snapshot_time = match_time - _PRE_MATCH_OFFSET

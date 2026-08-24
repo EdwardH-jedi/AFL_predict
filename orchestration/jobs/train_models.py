@@ -395,7 +395,11 @@ def _build_model_run_metadata(
 def _log_feature_importances(model: XGBoostModel) -> None:
     """Log XGBoost feature importances sorted by gain."""
     try:
-        importances = model._model.feature_importances_
+        booster = model._model
+        if booster is None:
+            logger.debug("_log_importances: model has no fitted booster — skipping.")
+            return
+        importances = booster.feature_importances_
         features = model._fit_features
         pairs = sorted(zip(features, importances), key=lambda x: x[1], reverse=True)
         lines = ["XGBoost feature importances (gain, top 15):"]

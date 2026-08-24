@@ -83,7 +83,7 @@ class XGBoostModel(BaseModel):
         self.colsample_bytree = colsample_bytree
         self.early_stopping_rounds = early_stopping_rounds
         self.random_state = random_state
-        self._model = None
+        self._model: Any = None  # XGBClassifier once fit() has run
         self._fit_features: list[str] = []
 
     def fit(

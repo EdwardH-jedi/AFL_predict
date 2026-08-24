@@ -249,7 +249,7 @@ class WeatherCollector:
             url = _FORECAST_URL
 
         try:
-            resp = httpx.get(url, params=params, timeout=30)
+            resp = httpx.get(url, params={k: str(v) for k, v in params.items()}, timeout=30)
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
@@ -291,9 +291,10 @@ class WeatherCollector:
         snap.wind_direction_deg = weather.get("winddirection_10m")
         snap.cloud_cover_pct = weather.get("cloudcover")
         snap.weather_code = weather.get("weathercode")
-        snap.is_raining = int(rain)
-        snap.is_high_wind = int(wind)
-        snap.is_extreme_heat = int(heat)
+        # Columns are Integer-backed booleans (SQLite has no native bool).
+        snap.is_raining = bool(rain)
+        snap.is_high_wind = bool(wind)
+        snap.is_extreme_heat = bool(heat)
         snap.source_type = source_type
 
         try:

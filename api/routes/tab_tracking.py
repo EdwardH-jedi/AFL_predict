@@ -426,7 +426,7 @@ def get_comparison(db: DbSession) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 @router.get("/today", summary="Today's picks — check before going to TAB")
-def get_today(days_ahead: int = 3, db: DbSession = None) -> dict[str, Any]:
+def get_today(days_ahead: int = 3, *, db: DbSession) -> dict[str, Any]:
     """
     Compact betting brief for upcoming matches with model recommendations.
 
@@ -530,8 +530,13 @@ def get_today(days_ahead: int = 3, db: DbSession = None) -> dict[str, Any]:
                 "suggested_stake_aud": suggested_aud,
                 "using_live_bankroll": using_live,
                 "rec_id":         rec.id,
-                "tier":           rec.tier,
-                "data_quality_ok": rec.data_quality_ok,
+                # `tier` and `data_quality_ok` are not columns on Recommendation
+                # and never have been — reading them raised AttributeError on
+                # every call to this endpoint. Found by mypy; the path had no
+                # test coverage. Reported as null until the fields either exist
+                # or the response contract drops them.
+                "tier":           None,
+                "data_quality_ok": None,
             }
         else:
             pick["recommendation"] = None

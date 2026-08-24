@@ -26,6 +26,7 @@ import argparse
 import json
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
@@ -34,6 +35,7 @@ from loguru import logger
 from backtesting.provenance import build_manifest, sha256_file
 from backtesting.runner import BacktestRunner
 from config.settings import get_settings
+from models.base_model import BaseModel
 from models.bookmaker_baseline import BookmakerBaseline
 from models.elo_baseline import EloBaseline
 from models.ensemble import TrainableEnsemble
@@ -166,6 +168,7 @@ def run(
     # versions, and the exact evaluation configuration.
     seasons = sorted(int(x) for x in df["season"].unique())
     ensemble_model = next((m for m in models if m.name == "ensemble"), None)
+    assert resolved_input is not None  # set whenever df is non-None
     result.provenance = build_manifest(
         input_path=resolved_input,
         n_rows=input_rows,
@@ -337,7 +340,7 @@ def _filter_seasons(df, min_season: int | None, max_season: int | None):
     return df.reset_index(drop=True)
 
 
-def _build_ensemble(elo_params: dict | None, xgb_params: dict | None):
+def _build_ensemble(elo_params: dict | None, xgb_params: dict | None) -> TrainableEnsemble | None:
     """
     Build the production-weighted ensemble for evaluation.
 
@@ -346,7 +349,7 @@ def _build_ensemble(elo_params: dict | None, xgb_params: dict | None):
     than a component) is reported and skipped. Returns None if fewer than two
     components remain, since a one-model 'ensemble' is just that model.
     """
-    factories = {
+    factories: dict[str, Callable[[], BaseModel]] = {
         # Present so a deliberately non-zero ENSEMBLE_WEIGHT_BOOKMAKER_BASELINE is
         # actually evaluated. Production iterates every configured component, so
         # omitting it here would silently benchmark a different blend than ships.
@@ -357,7 +360,7 @@ def _build_ensemble(elo_params: dict | None, xgb_params: dict | None):
         "elo_baseline": lambda: _make_elo(elo_params),
     }
 
-    components = []
+    components: list[tuple[BaseModel, float]] = []
     for name, weight in settings.ensemble_weights.items():
         factory = factories.get(name)
         if factory is None:

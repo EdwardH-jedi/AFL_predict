@@ -531,7 +531,7 @@ def get_roles(day: str | None = None) -> dict[str, Any]:
         if not path.exists():
             # Fall back to most recent artifact for this role
             candidates = sorted((base / role).glob("*.json")) if (base / role).exists() else []
-            path = candidates[-1] if candidates else None
+            path = candidates[-1] if candidates else None  # type: ignore[assignment]  # narrowed on the next line
         if path is None or not path.exists():
             out["roles"][role] = {"available": False}
             continue

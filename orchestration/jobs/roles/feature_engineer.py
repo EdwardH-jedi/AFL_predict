@@ -40,6 +40,7 @@ def run() -> None:
     logger.info("==> role:feature_engineer starting")
 
     parquet_path = _latest_parquet()
+    report: dict[str, Any]
     if parquet_path is None:
         report = {
             "generated_at": datetime.now(tz=UTC).isoformat(),

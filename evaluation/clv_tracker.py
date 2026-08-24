@@ -224,7 +224,9 @@ def clv_summary(records: list[CLVRecord]) -> dict:
             "median_clv_pct": None,
         }
 
-    clv_vals = [r.clv for r in clv_records]  # type: ignore[misc]
+    # `clv` is Optional on the record; drop unset values the same way clv_pct
+    # does below, rather than summing a list that may contain None.
+    clv_vals = [r.clv for r in clv_records if r.clv is not None]
     clv_pct_vals = [r.clv_pct for r in clv_records if r.clv_pct is not None]
 
     beat = sum(1 for v in clv_vals if v > 0)

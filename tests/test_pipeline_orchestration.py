@@ -30,13 +30,15 @@ def _make_job_module(fail_times: int = 0) -> types.ModuleType:
             raise ValueError(f"Simulated failure #{call_count['n']}")
 
     mod = types.ModuleType("mock_job")
-    mod.run = run
+    mod.run = run  # type: ignore[attr-defined]  # stub job module
     return mod
 
 
 def _make_always_failing_job() -> types.ModuleType:
     mod = types.ModuleType("always_fail")
-    mod.run = MagicMock(side_effect=RuntimeError("permanent failure"))
+    mod.run = MagicMock(  # type: ignore[attr-defined]  # stub job module
+        side_effect=RuntimeError("permanent failure")
+    )
     return mod
 
 

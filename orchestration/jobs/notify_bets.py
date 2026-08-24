@@ -79,6 +79,7 @@ def notify_bets(db: Session | None = None) -> bool:
     own_session = db is None
     if own_session:
         db = SessionLocal()
+    assert db is not None  # set above when the caller passed none
 
     try:
         picks = _load_todays_picks(db)

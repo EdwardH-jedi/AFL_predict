@@ -132,7 +132,7 @@ def _per_phase_brier(db: Session) -> dict[str, Any]:
         phase = _phase_of(match)
         buckets[phase].append((float(p), y))
 
-    phase_out = {}
+    phase_out: dict[str, dict[str, Any]] = {}
     for phase, pairs in buckets.items():
         if len(pairs) < _MIN_PHASE_SAMPLE:
             phase_out[phase] = {"n": len(pairs), "brier": None, "note": "below min sample"}

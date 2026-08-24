@@ -71,7 +71,7 @@ jobs:
         run: python -m scripts.validate_artifact examples/backtest_canonical.json
 
       - name: Static typing (mypy)
-        run: mypy --no-incremental orchestration/ backtesting/ models/ features/ config/
+        run: mypy --no-incremental .
 
       # Proves the headline command in the README works from a clean checkout
       # with no .env file, no database, and no network egress needed.

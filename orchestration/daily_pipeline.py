@@ -248,8 +248,9 @@ def run_pipeline(triggered_by: str = "manual") -> bool:
     # Persist final daily run state
     wall_duration = time.monotonic() - wall_start
     with db_session() as db:
-        daily_run = db.get(DailyPipelineRun, daily_run_id)
-        if daily_run:
+        final_run = db.get(DailyPipelineRun, daily_run_id)
+        if final_run:
+            daily_run = final_run
             daily_run.status = overall_status
             daily_run.completed_at = datetime.now(tz=UTC)
             daily_run.duration_seconds = round(wall_duration, 2)

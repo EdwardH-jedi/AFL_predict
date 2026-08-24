@@ -88,8 +88,15 @@ class OddsMovementExtractor(BaseExtractor):
             latest_home = latest.home_odds
             latest_away = latest.away_odds
 
-            # Need valid odds on both ends to compute drift
-            if None in (open_home, open_away, latest_home, latest_away):
+            # Need valid odds on both ends to compute drift.
+            # Written as explicit `is None` disjunction rather than
+            # `None in (...)` so the type checker narrows all four to float.
+            if (
+                open_home is None
+                or open_away is None
+                or latest_home is None
+                or latest_away is None
+            ):
                 result[match.id] = dict(_NULL_FEATURES)
                 continue
 

@@ -28,14 +28,14 @@ from backtesting.metrics import WindowMetrics, aggregate_metrics
 
 
 def _window(fold: str, n_settled: int, ece: float, **kw) -> WindowMetrics:
-    base = dict(
+    base: dict[str, object] = dict(
         model_name="m", fold_label=fold, n_matches=n_settled, n_settled=n_settled,
         brier_score=0.2, log_loss=0.6, accuracy=0.65, ece=ece,
         n_bets=0, n_no_bet=n_settled, hit_rate=math.nan, avg_edge=math.nan,
         total_staked=0.0, roi=math.nan,
     )
     base.update(kw)
-    return WindowMetrics(**base)
+    return WindowMetrics(**base)  # type: ignore[arg-type]  # heterogeneous test kwargs
 
 
 # ---------------------------------------------------------------------------

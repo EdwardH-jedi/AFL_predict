@@ -163,7 +163,7 @@ class EloBaseline(BaseModel):
 
     def _season_regression(self) -> None:
         """Regress all team ratings towards the mean at the start of a new season."""
-        mean = np.mean(list(self.ratings.values())) if self.ratings else INITIAL_RATING
+        mean = float(np.mean(list(self.ratings.values()))) if self.ratings else INITIAL_RATING
         self.ratings = {
             team_id: rating + self.season_regression * (mean - rating)
             for team_id, rating in self.ratings.items()
