@@ -131,3 +131,20 @@ def test_dashboard_clv_contract(db_session):
         "avg_clv_pct",
         "median_clv_pct",
     }
+
+
+def test_backtest_summary_ensemble_weights_contract(db_session):
+    """ensemble_weights must report the members/values actually used by the
+    production ensemble (single-sourced from config.settings)."""
+    from api.routes.dashboard_ui import backtest_summary
+    from config.settings import get_settings
+
+    settings = get_settings()
+    body = backtest_summary(db_session)
+
+    weights = body.ensemble_weights
+    assert set(weights.model_fields) == {"logistic", "elo", "xgboost", "poisson"}
+    assert weights.logistic == settings.ensemble_weight_logistic
+    assert weights.elo == settings.ensemble_weight_elo
+    assert weights.xgboost == settings.ensemble_weight_xgboost
+    assert weights.poisson == settings.ensemble_weight_poisson

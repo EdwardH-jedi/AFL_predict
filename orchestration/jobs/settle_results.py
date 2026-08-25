@@ -113,8 +113,9 @@ def _compute_clv(db, match: Match, side: str, recommended_odds: float | None):
     """
     Find the last odds snapshot before match_time and compute CLV.
 
-    CLV = (1/recommended_odds) - (1/closing_odds)
-    Positive = we identified value vs market close.
+    CLV = (1/closing_odds) - (1/recommended_odds)
+    Positive = we beat the closing line (bet at better odds than the close).
+    Same sign convention as evaluation/clv_tracker.py.
 
     Returns:
         (closing_odds, closing_implied_prob, clv) — all None if no snapshot found.
@@ -142,7 +143,7 @@ def _compute_clv(db, match: Match, side: str, recommended_odds: float | None):
 
     closing_implied_prob = round(1.0 / closing_odds, 6)
     rec_implied_prob = 1.0 / recommended_odds
-    clv = round(rec_implied_prob - closing_implied_prob, 6)
+    clv = round(closing_implied_prob - rec_implied_prob, 6)
 
     return closing_odds, closing_implied_prob, clv
 
