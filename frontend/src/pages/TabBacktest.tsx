@@ -30,7 +30,7 @@ const WEIGHT_COLORS: Record<string, string> = {
   xgboost: "#10b981",
   elo: "#7dd3fc",
   poisson: "#a78bfa",
-  bookmaker: "#f59e0b",
+  logistic: "#f59e0b",
 };
 
 export function TabBacktest() {
@@ -53,12 +53,12 @@ export function TabBacktest() {
   // Ensemble pie data — real weights from the backend.
   const weights = data.ensemble_weights;
   const totalWeight =
-    weights.bookmaker + weights.elo + weights.xgboost + weights.poisson || 1;
+    weights.logistic + weights.elo + weights.xgboost + weights.poisson || 1;
   const ensembleData = [
     { name: "XGBoost", value: pct(weights.xgboost, totalWeight), color: WEIGHT_COLORS.xgboost },
     { name: "ELO", value: pct(weights.elo, totalWeight), color: WEIGHT_COLORS.elo },
     { name: "Poisson", value: pct(weights.poisson, totalWeight), color: WEIGHT_COLORS.poisson },
-    { name: "Bookmaker", value: pct(weights.bookmaker, totalWeight), color: WEIGHT_COLORS.bookmaker },
+    { name: "Logistic", value: pct(weights.logistic, totalWeight), color: WEIGHT_COLORS.logistic },
   ];
 
   const sampled = LONG_BANKROLL.filter(

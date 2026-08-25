@@ -61,14 +61,15 @@ _MODEL_REGISTRY: dict[str, type[BaseModel]] = {
 # 'bookmaker_baseline' / 'elo_baseline' (set by BaseModel.name on each class).
 _STATELESS_MODELS = {"bookmaker", "bookmaker_baseline", "elo", "elo_baseline"}
 
-# Ensemble component weights.
+# Ensemble component weights (single source: config.settings ensemble_weight_*).
 # XGBoost/Logistic share the heavy lifting; Poisson adds score-distribution
 # calibration; ELO acts as a stable low-variance regulariser.
+_settings = get_settings()
 _ENSEMBLE_WEIGHTS: dict[str, float] = {
-    "logistic_baseline": 0.30,
-    "xgboost": 0.35,
-    "poisson": 0.20,
-    "elo_baseline": 0.15,
+    "logistic_baseline": _settings.ensemble_weight_logistic,
+    "xgboost": _settings.ensemble_weight_xgboost,
+    "poisson": _settings.ensemble_weight_poisson,
+    "elo_baseline": _settings.ensemble_weight_elo,
 }
 
 

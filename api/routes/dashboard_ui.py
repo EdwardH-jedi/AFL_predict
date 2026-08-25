@@ -180,7 +180,7 @@ class OddsTrackerResponse(BaseModel):
 # --- backtest-summary ---
 
 class EnsembleWeights(BaseModel):
-    bookmaker: float
+    logistic: float
     elo: float
     xgboost: float
     poisson: float
@@ -545,7 +545,7 @@ def odds_tracker(db: DbSession) -> OddsTrackerResponse:
 @router.get("/backtest-summary", response_model=BacktestSummaryResponse)
 def backtest_summary(db: DbSession) -> BacktestSummaryResponse:
     weights = EnsembleWeights(
-        bookmaker=settings.ensemble_weight_bookmaker,
+        logistic=settings.ensemble_weight_logistic,
         elo=settings.ensemble_weight_elo,
         xgboost=settings.ensemble_weight_xgboost,
         poisson=settings.ensemble_weight_poisson,

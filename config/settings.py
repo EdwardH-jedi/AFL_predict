@@ -124,10 +124,13 @@ class Settings(BaseSettings):
     )
 
     # --- Ensemble Weights ---
-    ensemble_weight_bookmaker: float = Field(default=0.30)
-    ensemble_weight_elo: float = Field(default=0.10)
+    # Single source of truth for the production ensemble built in
+    # orchestration/jobs/generate_recommendations.py and reported by
+    # /api/dashboard/backtest-summary.
+    ensemble_weight_logistic: float = Field(default=0.30)
+    ensemble_weight_elo: float = Field(default=0.15)
     ensemble_weight_xgboost: float = Field(default=0.35)
-    ensemble_weight_poisson: float = Field(default=0.25)
+    ensemble_weight_poisson: float = Field(default=0.20)
 
     # --- Dual-Machine Architecture ---
     # NODE_ROLE controls which pipeline jobs run on this machine:

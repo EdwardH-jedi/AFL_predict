@@ -237,7 +237,14 @@ class TestCriticalTodosCheck:
         assert result.value == len(CRITICAL_TODOS)
 
     def test_pass_when_todos_empty(self):
+        # _check_critical_todos also appends a runtime TODO while
+        # settings.tab_bookmaker_confirmed is False, so both sources must be
+        # controlled to exercise the "no todos -> pass" branch.
+        from evaluation import live_readiness
         from evaluation.live_readiness import _check_critical_todos
-        with patch("evaluation.live_readiness.CRITICAL_TODOS", []):
+        with (
+            patch("evaluation.live_readiness.CRITICAL_TODOS", []),
+            patch.object(live_readiness.settings, "tab_bookmaker_confirmed", True),
+        ):
             result = _check_critical_todos()
         assert result.status == "pass"
