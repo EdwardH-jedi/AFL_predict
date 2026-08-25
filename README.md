@@ -1,15 +1,37 @@
 # AFL Predict
 
-Paper-trading-first AFL betting research system.
+A historical/backtesting **research system** for AFL (Australian Rules
+Football) head-to-head match prediction, run paper-trading-first.
+**There is no live-money betting automation anywhere in this codebase** —
+recommendations are analytics and Discord alerts only, and every
+recommendation is hard-coded `paper_trade=True`.
 
-No live betting or real-money automation is intended in this repository.
+**Central research question:** can a calibrated ensemble of statistical
+models (Elo, logistic regression, XGBoost, Poisson) extract predictive
+signal beyond public bookmaker prices on AFL H2H markets — measured by
+Brier score, log loss, calibration (ECE), and Closing Line Value on a
+leakage-controlled, walk-forward backtest?
+
+**Stack:** Python 3.11 · FastAPI · SQLAlchemy 2 + Alembic (SQLite/PostgreSQL)
+· scikit-learn / XGBoost / statsmodels · pandas + pyarrow · pytest + ruff
+· React/TypeScript dashboard.
 
 ## Current status
 
-The repository now contains active work across API routes, feature extraction,
-model training, recommendations, migrations, and machine-operation docs.
-The current working tree is still under verification and should not be treated
-as merge-ready without checking `docs/T6_MERGE_READINESS.md`.
+- **Code verified:** 313 tests passing (1 by-design skip), Alembic migration
+  chain builds a fresh database from scratch, daily pipeline and readiness
+  gate run end-to-end.
+- **Research results: preliminary, not reproducible from this repo alone.**
+  No dataset or backtest artifacts are bundled; historical metric snapshots
+  in `ACCURACY_PLAN.md` carry explicit caveats. In particular, **no claim is
+  made that any model beats bookmaker prices** — the recorded bookmaker
+  baseline was computed with ~0% odds coverage and is not a valid market
+  comparison.
+- The paper-trading log is empty (no live-trial results yet), and the
+  live-readiness gate correctly reports `not_ready`.
+- Verification evidence and remaining limitations:
+  `docs/T6_MERGE_READINESS.md`. Concise summary for reviewers:
+  `docs/PORTFOLIO_FACTS.md`.
 
 ## Architecture
 
@@ -137,4 +159,4 @@ This creates a throwaway SQLite database in a temp directory, runs
 - Keep source changes separate from generated artifacts under `logs/`, `reviews/`, and `storage/`.
 - Re-run training, backtesting, and readiness checks on the final intended tree before merge.
 - Confirm dual-machine environment settings in `.env.example` before release or operator handoff.
-- Use `docs/T6_MERGE_READINESS.md` for the current merge checklist and PR-splitting guidance.
+- See `docs/T6_MERGE_READINESS.md` for the verification closeout record and standing limitations.

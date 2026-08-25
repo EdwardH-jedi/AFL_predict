@@ -2,12 +2,24 @@
 
 ## Current Baseline (as of 2026-04-10)
 
+> **Caveat — read before citing these numbers.** This table is a historical
+> snapshot from 2026-04-10 and has not since been reproduced; the repository
+> does not bundle the dataset or backtest artifacts needed to regenerate it.
+> The **Bookmaker Baseline row is not a valid market comparison**: as P1 below
+> documents, bookmaker odds had ~0% coverage in the training data at the time,
+> so that baseline was computed almost entirely from fallback values. **No
+> "model beats the bookmaker" conclusion can be drawn from this table.** A real
+> bookmaker baseline (with full odds coverage) is expected to be the hardest
+> benchmark to beat — see `docs/backtesting.md`.
+
 | Model              | Brier Score | Log Loss | Accuracy | Training Features     |
 |--------------------|-------------|----------|----------|-----------------------|
 | Logistic Baseline  | 0.1830      | 0.5397   | 69.0%    | 13 (ELO + form + venue) |
 | ELO Baseline       | 0.2039      | 0.5889   | 67.1%    | Stateless             |
-| Bookmaker Baseline | 0.2430      | 0.6769   | 62.5%    | Implied prob only     |
+| Bookmaker Baseline | 0.2430*     | 0.6769*  | 62.5%*   | Implied prob only     |
 | Always-Home Naive  | —           | —        | 56.9%    | None                  |
+
+\* Computed with ~0% real odds coverage — not representative of bookmaker skill.
 
 - **Best model beats always-home by +12.1 pp** — meaningful but room to grow
 - **Brier reference**: 0.25 = coin-flip; 0.18 = decent; elite sports models reach ~0.16
@@ -229,11 +241,14 @@ After each phase, run `/backtest` and compare against current baseline:
 
 | Checkpoint     | Target Brier | Target Accuracy | Target CLV  |
 |----------------|-------------|-----------------|-------------|
-| Current        | 0.183       | 69.0%           | Unknown     |
+| Current        | 0.183†      | 69.0%†          | Unknown     |
 | After Phase 1  | ≤ 0.176     | ≥ 70.0%         | > 0         |
 | After Phase 2  | ≤ 0.171     | ≥ 70.5%         | > 0         |
 | After Phase 3  | ≤ 0.167     | ≥ 71.0%         | > +1%       |
 | After Phase 4  | ≤ 0.163     | ≥ 71.5%         | > +2%       |
+
+† Historical 2026-04-10 snapshot values (see caveat at the top of this file);
+not since reproduced.
 
 CLV (Closing Line Value) is the most important long-term metric — positive CLV
 means the model consistently identifies value before the market closes.

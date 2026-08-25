@@ -21,9 +21,10 @@ Every model inherits `BaseModel` (`models/base_model.py`), an ABC whose contract
 
 **Ensemble** — `ensemble.py` produces a normalized **weighted average** of component probabilities.
 - An `optimize_weights()` method exists (minimizes Brier score via `scipy.optimize.minimize`, Nelder-Mead) **but is not called in the production path.**
-- Production weights are **hardcoded config values.** Note a discrepancy between two sources:
-  - `config/settings.py`: bookmaker 0.30 / elo 0.10 / xgboost 0.35 / poisson 0.25
-  - `orchestration/jobs/generate_recommendations.py`: logistic 0.30 / xgboost 0.35 / poisson 0.20 / elo 0.15 *(this is the dict actually used to build the ensemble)*
+- Production weights are **static config values**, single-sourced from
+  `config/settings.py` (`ensemble_weight_*`: logistic 0.30 / xgboost 0.35 /
+  poisson 0.20 / elo 0.15) and consumed by both
+  `orchestration/jobs/generate_recommendations.py` and the dashboard API.
 
 **Hyperparameter tuning** — grid search with expanding-window walk-forward validation, ranked by fold-size-weighted mean Brier score (**no Optuna/Bayesian search**):
 - `backtesting/xgb_tuner.py` — 144-combo grid (depth × lr × n_estimators × subsample) → `xgb_best_params.json`
@@ -139,8 +140,11 @@ All subclass `BaseExtractor`, return `{match_id: {feature: value}}`, and enforce
 
 ## Notable observations
 
-- **Ensemble weight discrepancy** — `settings.py` and `generate_recommendations.py` define different weight dicts (and different member sets); the recommendations job's hardcoded dict is the one used. Worth reconciling.
 - **`optimize_weights()` is dead in production** — defined (Nelder-Mead Brier minimization) but never invoked; weights are static.
 - **Feature loss between parquet and DB** — `match_features` persists only a subset; models train from parquet, so the DB table under-represents the true feature vector.
-- **Possible readiness import mismatch** — `risk_manager.py` imports `evaluate_readiness` while `live_readiness.py` exposes `evaluate()`; unless aliased, the readiness snapshot silently falls into the "not importable" branch.
-- **Stray repo-root artifacts** — files `=0.14`, `=0.44`, `=2.0` and a `-p/` directory look like accidental pip-redirect outputs, not part of the stack.
+
+Resolved since this report was first written:
+
+- ~~Ensemble weight discrepancy~~ — weights are now single-sourced from `config/settings.py`; the recommendations job and dashboard read the same values.
+- ~~Readiness import mismatch~~ — `risk_manager.py` now imports `evaluate as evaluate_readiness`.
+- ~~Stray repo-root artifacts~~ — the accidental pip-redirect files (`=0.14`, `=0.44`, `=2.0`) have been removed from the repository.
