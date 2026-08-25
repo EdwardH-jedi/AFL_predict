@@ -25,7 +25,7 @@ python --version
 | 머신 | 경로 |
 |------|------|
 | 서버 컴퓨터 (RX 6600) | `C:\Users\<you>\AFL_predict` |
-| 메인 컴퓨터 (RTX 5080) | `C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict` |
+| 메인 컴퓨터 (RTX 5080) | `C:\Users\<you>\AFL_predict` |
 
 ### 3. venv 생성 및 패키지 설치 (각 머신에서 독립적으로)
 
@@ -39,7 +39,7 @@ pip install -r requirements.txt
 
 **메인:**
 ```cmd
-cd "C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict"
+cd "C:\Users\<you>\AFL_predict"
 python -m venv .venv
 .venv\Scripts\activate.bat
 pip install -r requirements.txt
@@ -207,7 +207,7 @@ mkdir "C:\Users\<you>\AFL_predict\logs"
 ### Step 1 — .env 파일 생성
 
 ```cmd
-cd "C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict"
+cd "C:\Users\<you>\AFL_predict"
 copy .env.example .env
 ```
 
@@ -257,7 +257,7 @@ python -c "from db.session import SessionLocal; db=SessionLocal(); print('DB con
 - 트리거: 매일 09:30
 - 동작: 프로그램/스크립트
   ```
-  C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict\.venv\Scripts\python.exe
+  C:\Users\<you>\AFL_predict\.venv\Scripts\python.exe
   ```
   인수:
   ```
@@ -265,7 +265,7 @@ python -c "from db.session import SessionLocal; db=SessionLocal(); print('DB con
   ```
   시작 위치:
   ```
-  C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict
+  C:\Users\<you>\AFL_predict
   ```
 
 실행 내용 (NODE_ROLE=predictor 기준):

@@ -1,8 +1,9 @@
 # Project Status
 
-**Last verified:** 2026-08-21
+**Last verified:** 2026-08-25
 **Repository:** EdwardH-jedi/AFL_predict
 **Default branch:** `main`
+**Working branch:** `fix/scientific-reproducibility-integrity`
 **Status:** Research
 
 ---
@@ -97,7 +98,7 @@ It is *not* a production service and *not* a deployed product.
 | CLV tracking | `evaluation/clv_tracker.py` implemented; sample too small to report. |
 | Live readiness gate | Implemented and evaluable; a `ready` verdict authorises nothing and there is no mechanism to act on it. |
 | React frontend (`frontend/`) | Vite/TypeScript app covering the same endpoints; secondary to the static dashboard and not the canonical UI. |
-| mypy | Configured in `pyproject.toml` and installed, but no Make target and not in CI. 49 errors currently. |
+| mypy | **Now enforced.** Zero errors across 173 files; runs in CI as `mypy --no-incremental .`. |
 
 ---
 
@@ -116,22 +117,29 @@ It is *not* a production service and *not* a deployed product.
 ## 6. Validation
 
 All commands run from the repository root inside the project virtualenv, on
-2026-08-21.
+2026-08-25. Also re-run inside a fresh clone with dependencies installed from
+`requirements.lock` — identical results.
 
 | Check | Command | Result |
 |---|---|---|
 | Lint | `ruff check .` | **Pass** — "All checks passed!" |
-| Unit + integration tests | `pytest tests/ -q` | **Pass** — 344 passed, 1 skipped |
-| Test collection | `pytest tests/ --collect-only -q` | 345 tests |
-| Fresh-DB migration | `python -m pytest tests/test_alembic_fresh_db.py -v` | **Pass** — 1 passed |
-| Dashboard semantics | `pytest tests/test_dashboard_edge_semantics.py -q` | **Pass** — 7 passed |
-| Backtest smoke / metric generation | `python -m orchestration.jobs.run_backtest --min-season 2017 --max-season 2025 --untuned` | **Pass** — reproduces `examples/backtest_canonical.json` exactly |
+| Unit + integration tests | `pytest tests/ -q` | **Pass** — 399 passed, 1 skipped |
+| Typecheck | `mypy --no-incremental .` | **Pass** — 0 errors across 173 source files |
+| Fresh-DB migration | `pytest tests/test_alembic_fresh_db.py -v` | **Pass** — 1 passed (chain `0000`–`0009`) |
+| Scientific regression (frozen fixture) | `pytest tests/test_scientific_regression.py -q` | **Pass** — 11 passed in ~1s |
+| Calibration aggregation | `pytest tests/test_calibration_aggregation.py -q` | **Pass** — 8 passed |
+| Artifact provenance / tamper check | `python -m scripts.validate_artifact examples/backtest_canonical.json` | **Pass** — well-formed, self-auditable v2 artifact |
+| Canonical metric regeneration | `run_backtest --features <path> --expect-sha256 <sha> --min-season 2017 --max-season 2025 --untuned` | **Pass** — reproduces `examples/backtest_canonical.json` exactly |
 | Demo | `make demo` | **Pass** — runs with no `.env`, database or network |
-| Typecheck | `python -m mypy .` | **Fail** — 49 errors in 16 files. Configured but never enforced; not in CI and no Make target. |
-| CI | `.github/workflows/ci.yml` | Runs lint, tests, fresh-DB migration, demo, and a clean-tree gate on Python 3.11. Does **not** run mypy. |
+| CI | `.github/workflows/ci.yml` | Lint, tests, mypy, fresh-DB migration, frozen scientific fixture, artifact validation, demo, clean-tree gate. Installs from `requirements.lock`. |
 
 The one skipped test is skipped by design (`CRITICAL_TODOS` is empty, so the
 "fails when TODOs present" case has nothing to assert).
+
+Typecheck moved from 49 errors / 16 files to zero. One of those errors was a
+latent runtime bug, not a style issue: `/api/tab/today` read `rec.tier` and
+`rec.data_quality_ok`, neither of which is a column on `Recommendation`, so every
+call raised `AttributeError` on an untested path.
 
 ---
 
@@ -169,21 +177,29 @@ The one skipped test is skipped by design (`CRITICAL_TODOS` is empty, so the
    reach the port can corrupt the paper-trading ledger, and with it the ROI and
    CLV history the readiness gate depends on. No real money is reachable.
    Acceptable on a trusted LAN; not acceptable publicly.
-2. **Hard-dependency gating is weaker than intended.** The guard is
-   `if spec.hard_dep and hard_dep_failed`, so a job is skipped only when *it*
-   carries `hard_dep=True`. Only `ingest_afl`, `ingest_tab_odds` and
-   `build_features` do, and nothing hard-dep follows `build_features` — so a
-   feature-build failure skips nothing and `generate_recommendations` runs
-   against stale features. The intent was to gate downstream work; the
-   implementation gates only the remaining critical chain.
-3. **mypy is configured but never enforced** — 49 errors.
-4. **Player-availability and weather features carry no signal** (§4).
-5. **The Poisson model is effectively a global baseline**, not a match-specific model (§4).
-6. **Evaluation is not bit-reproducible from a clean clone** — gitignored parquet, live upstream data, unpinned dependency ranges.
-7. **The static dashboard is a design prototype.** Panels the data layer does not populate still display placeholder values; documented panel-by-panel in `docs/assets/README.md`.
-8. **No bootstrap confidence intervals** for the canonical run, so no result carries a significance claim.
+2. **Player-availability and weather features carry no signal.** Both families are
+   constant across the canonical dataset, so they contribute nothing. Their as-of
+   boundaries are now enforced (fail-closed), which makes the leakage guarantee
+   true but does not create signal.
+3. **The Poisson model is effectively a global baseline**, not a match-specific
+   model — its GLM sees only an intercept and `is_final`.
+4. **Evaluation is not bit-reproducible from a clean clone.** The input is
+   checksummed and the environment is pinned via `requirements.lock`, but the
+   feature parquet is gitignored, so a fresh clone cannot run the canonical
+   command without first obtaining or rebuilding it.
+5. **The static dashboard is a design prototype.** Panels the data layer does not
+   populate still display placeholder values; documented panel-by-panel in
+   `docs/assets/README.md`.
+6. **No bootstrap confidence intervals** for the canonical run, so no result
+   carries a significance claim. `backtesting/bootstrap.py` exists but was not
+   run for the published artifact.
+7. **The ensemble-vs-market calibration result is bin-sensitive.** On pooled ECE
+   the ensemble leads at 5–20 bins and loses at 25. Reported as suggestive, not
+   established.
 
----
+**Resolved since the previous status** (retained here so the change is visible):
+hard-dependency gating now blocks recommendations on failed or degraded upstream
+jobs; mypy is at zero and enforced in CI.
 
 ## 10. Technical debt
 
@@ -198,20 +214,22 @@ The one skipped test is skipped by design (`CRITICAL_TODOS` is empty, so the
 
 ## 11. Next recommended work
 
-1. **Make hard-dependency gating do what the name implies.** Today a
-   `build_features` failure skips nothing and `generate_recommendations` runs on
-   stale features (§9.2). Either gate on the *upstream* job's status or mark the
-   downstream consumers `hard_dep=True`.
-2. **Compute bootstrap confidence intervals** for the canonical evaluation
-   (`backtesting/bootstrap.py` already exists) so results can carry significance
-   claims instead of being reported as bare point estimates.
-3. **Close the leakage-test gap.** Eight of eleven extractors have no
-   extractor-level leakage test, and the weather extractor joins on `match_id`
-   without asserting `fetched_at < match_time`.
-4. **Bring mypy to zero and enforce it** — add a `typecheck` target and a CI step;
-   it currently reports 49 errors and runs nowhere.
-5. **Make the evaluation reproducible from a clean clone** — pin a dependency
-   lockfile and commit the feature parquet or a checksum of it.
+1. **Compute bootstrap confidence intervals** for the canonical evaluation.
+   `backtesting/bootstrap.py` already exists; wiring it in is the single highest-
+   value remaining item, because every current result is a bare point estimate
+   and no significance can be claimed without it. Prefer a block/paired scheme
+   that respects season and team dependence rather than assuming i.i.d. bets.
+2. **Publish or commit the canonical feature parquet** (~264 KB) alongside its
+   SHA-256, closing the last gap to clean-clone reproducibility. Everything else
+   for it — the checksum gate, the lockfile, the provenance manifest — is done.
+3. **Close the leakage-test gap.** Eight of eleven extractors still have no
+   extractor-level leakage test; only Elo, form and bookmaker do.
+4. **Bind the API to `127.0.0.1` by default** and document the reverse-proxy or
+   VPN path for LAN access, so the unauthenticated routers are not reachable by
+   default.
+5. **Decide the fate of the two signal-free feature families** — wire a pre-match
+   team-sheet source and a historical weather backfill, or remove them and their
+   claims.
 
 ## 12. Portfolio readiness
 

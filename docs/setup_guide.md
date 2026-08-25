@@ -76,7 +76,7 @@ git clone <repo-url> AFL_predict
 cd AFL_predict
 
 # 개발 머신(OneDrive 동기화 중)이라면 이미 있는 폴더로 이동
-cd "C:\Users\user\OneDrive\바탕 화면\AFL_predict"
+cd "C:\Users\<you>\AFL_predict"
 ```
 
 ### 4. PostgreSQL 설치 (DB를 로컬에 둘 경우)

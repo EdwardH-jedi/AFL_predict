@@ -2,7 +2,7 @@
 # 저장소가 codex-hub 하위로 이동한 뒤 옛 경로를 가리키던 AFL_* 작업들을 정리한다.
 # 반드시 "관리자 PowerShell"에서 실행:
 #   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-#   & "C:\Users\user\OneDrive\바탕 화면\codex-hub\AFL_predict\ops\fix_task_paths_rtx5080.ps1"
+#   & "C:\Users\<you>\AFL_predict\ops\fix_task_paths_rtx5080.ps1"
 #
 # 하는 일:
 #   1. 옛 경로를 가리키는 AFL_* 작업 전부 제거
