@@ -63,7 +63,10 @@ Found by the independent (Codex) review of this pass and fixed:
    convention in `evaluation/clv_tracker.py` (positive = beat the close) —
    so per-bet CLV shown by the dashboard/Discord history had inverted sign.
    Now aligned with the canonical convention. (Aggregate CLV summaries were
-   unaffected — they recompute via `clv_tracker`.)
+   unaffected — they recompute via `clv_tracker`.) Note for operators: the
+   fix corrects future writes only — `BetOutcome.clv` rows already settled
+   in an existing operator database carry the old (inverted) sign and need
+   recomputation before per-bet CLV history can be compared across the fix.
 5. Weather look-ahead disclosure: historical `weather_*` features come from
    Open-Meteo *archive* observations at kickoff, not pre-match forecasts —
    post-bet-time information. Documented in `docs/backtesting.md` ("Known
