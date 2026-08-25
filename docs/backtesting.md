@@ -51,6 +51,17 @@ The `features/validators.py` leakage checks will log `ERROR`-level messages
 if violations are detected during `build_features`. Any non-zero leakage count
 must be investigated and fixed before trusting results.
 
+### Known deviation: historical weather features
+
+For settled matches, `weather_*` features come from the Open-Meteo **archive**
+API — i.e. the *observed* conditions at kickoff, not the forecast that would
+have been available when a pre-match bet was placed. Observed kickoff weather
+is post-bet-time information: backtests that use weather features are
+therefore mildly optimistic about weather signal, and there is train/serve
+skew versus live operation (which uses forecasts). Treat any incremental
+lift attributed to weather features with suspicion until forecast-issued-at
+snapshots (`fetched_at < match_time`) are stored and used for training.
+
 ---
 
 ## Split Strategy

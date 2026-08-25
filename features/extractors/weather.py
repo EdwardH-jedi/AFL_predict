@@ -25,10 +25,14 @@ weather_scoring_index formula:
   Capped to [0.5, 1.0].
 
 Leakage policy:
-  Weather is fetched for the match kickoff time (not after). Historical
-  weather data from Open-Meteo is an observation, not a prediction.
-  No leakage risk: we're using actual conditions at the time of play.
-  For upcoming matches, forecast weather is used — clearly available pre-match.
+  Weather is fetched for the match kickoff time (not after). For upcoming
+  matches, forecast weather is used — available pre-match. For settled
+  matches, however, the Open-Meteo *archive* supplies OBSERVED kickoff
+  conditions, which are post-bet-time information: a bettor at decision time
+  only has a forecast. Backtests using these features are therefore mildly
+  optimistic about weather signal, and live operation (forecast-based) is
+  skewed versus training (observation-based). See docs/backtesting.md
+  "Known deviation: historical weather features".
 
 Requires a SQLAlchemy Session.
 """

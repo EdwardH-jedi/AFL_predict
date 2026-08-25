@@ -6,11 +6,14 @@ Football) head-to-head match prediction, run paper-trading-first.
 recommendations are analytics and Discord alerts only, and every
 recommendation is hard-coded `paper_trade=True`.
 
-**Central research question:** can a calibrated ensemble of statistical
-models (Elo, logistic regression, XGBoost, Poisson) extract predictive
-signal beyond public bookmaker prices on AFL H2H markets — measured by
-Brier score, log loss, calibration (ECE), and Closing Line Value on a
-leakage-controlled, walk-forward backtest?
+**Central research question:** can statistical models (Elo, logistic
+regression, XGBoost, Poisson — combined in production as a calibrated
+ensemble) extract predictive signal beyond public bookmaker prices on AFL
+H2H markets — measured by Brier score, log loss, calibration (ECE), and
+Closing Line Value? Individual models are evaluated by a walk-forward
+backtest under an enforced pre-match leakage policy (one documented
+exception: historical weather features use observed kickoff conditions
+rather than pre-match forecasts — see `docs/backtesting.md`).
 
 **Stack:** Python 3.11 · FastAPI · SQLAlchemy 2 + Alembic (SQLite/PostgreSQL)
 · scikit-learn / XGBoost / statsmodels · pandas + pyarrow · pytest + ruff

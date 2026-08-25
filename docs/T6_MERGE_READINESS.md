@@ -56,6 +56,28 @@ docs must not — and now do not — claim verified predictive performance. See
    `=2.0` (pip output captured by unquoted `>=` specifiers in PowerShell) and
    a root `settings.json` (local tool permissions file).
 
+Found by the independent (Codex) review of this pass and fixed:
+
+4. CLV sign inversion: `settle_results._compute_clv` persisted
+   `(1/bet_odds) − (1/closing_odds)` — the opposite of the documented
+   convention in `evaluation/clv_tracker.py` (positive = beat the close) —
+   so per-bet CLV shown by the dashboard/Discord history had inverted sign.
+   Now aligned with the canonical convention. (Aggregate CLV summaries were
+   unaffected — they recompute via `clv_tracker`.)
+5. Weather look-ahead disclosure: historical `weather_*` features come from
+   Open-Meteo *archive* observations at kickoff, not pre-match forecasts —
+   post-bet-time information. Documented in `docs/backtesting.md` ("Known
+   deviation"), the extractor docstring, README, and PORTFOLIO_FACTS; the
+   code path itself is unchanged (fixing it needs forecast-issued-at
+   snapshots and is future work).
+6. Doc-accuracy corrections: `ACCURACY_PLAN.md` marked as a historical
+   planning document (its "missing" items have since been implemented), and
+   README/PORTFOLIO_FACTS wording corrected so the backtest is described as
+   evaluating individual models (the calibrated ensemble used in production
+   is not yet covered by the backtest runner).
+7. Added a contract test for `/api/dashboard/backtest-summary` ensemble
+   weights (previously uncovered).
+
 ## Generated artifacts policy (unchanged)
 
 `logs/**`, `reviews/**`, `storage/daily_summaries/**`, and

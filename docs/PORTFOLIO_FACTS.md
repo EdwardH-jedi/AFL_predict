@@ -34,9 +34,12 @@ daily-summary artifacts, role-based audit jobs, Alembic migration chain
 
 **Evaluation method.** Walk-forward (expanding-window) backtests split by
 season; leakage prevented at extractor level (`snapshot_time < match_time`)
-and asserted at split level (`LeakageError` on temporal overlap); models
-compared against a coin-flip baseline, an always-home baseline, and a
-de-vigged bookmaker-implied baseline.
+and asserted at split level (`LeakageError` on temporal overlap). The
+backtest runner evaluates the five individual models — a de-vigged
+bookmaker-implied baseline (the benchmark to beat), Elo, logistic, XGBoost,
+Poisson — on Brier score, log loss, accuracy, ECE, and a paper-staking
+simulation. Calibration and ensembling are applied in the production
+training/recommendation path, not (yet) inside the backtest runner.
 
 **Verified results (reproducible from this repo).**
 - 313 automated tests passing (1 by-design skip), including migration
@@ -56,6 +59,12 @@ de-vigged bookmaker-implied baseline.
   backtest-result artifacts; regenerating them requires re-ingesting external
   data.
 - The paper-trading log is empty — zero recorded paper-trading outcomes.
+- Historical weather features use Open-Meteo *observed* kickoff conditions,
+  not the forecast that would have been available pre-match — a documented
+  look-ahead exception that can make backtests using weather features
+  optimistic and creates train/serve skew versus live forecasts.
+- The backtest runner covers the individual models only; the calibrated
+  ensemble used in production recommendations has not been backtested.
 - Single-market scope (H2H only), free-tier data sources, no closing-line
   movement modelling in the backtest simulation.
 

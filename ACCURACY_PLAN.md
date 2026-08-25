@@ -1,5 +1,13 @@
 # AFL Predict — Accuracy Improvement Plan
 
+> **Status: historical planning document (written 2026-04-10).** Much of what
+> it diagnoses as missing has since been implemented — XGBoost and Poisson are
+> trained by `train_models.py`, recommendations build a weighted ensemble,
+> and the H2H / multi-scale form / venue-performance / travel / weather
+> extractors and isotonic calibration all exist (see `docs/SYSTEM_REPORT.md`
+> for the current architecture). The problem descriptions below describe the
+> April 2026 state, not the present code.
+
 ## Current Baseline (as of 2026-04-10)
 
 > **Caveat — read before citing these numbers.** This table is a historical
