@@ -19,6 +19,26 @@ rather than pre-match forecasts — see `docs/backtesting.md`).
 · scikit-learn / XGBoost / statsmodels · pandas + pyarrow · pytest + ruff
 · React/TypeScript dashboard.
 
+[Evaluation evidence and limitations](docs/PORTFOLIO_FACTS.md) ·
+[Automated regression checks](https://github.com/EdwardH-jedi/AFL_predict/actions/workflows/ci.yml) ·
+[Backtesting method](docs/backtesting.md)
+
+## What to review first
+
+1. **Evaluation design:** [temporal splits](backtesting/splits.py) enforce
+   training-before-test order; the [split tests](tests/test_splits.py) check
+   overlap rejection.
+2. **Operational behavior:** [readiness checks](evaluation/live_readiness.py)
+   report missing evidence instead of presenting an unvalidated system as ready.
+3. **Reproducibility:** CI runs the regression suite, including the fresh-database
+   migration test. It does not ingest live data, post Discord messages, or
+   establish predictive performance.
+
+The next research milestone is a versioned, reproducible baseline-versus-final-model
+comparison. It needs the dataset acquisition/version record, temporal splits,
+eligible pre-match features, model configuration, and per-match predictions plus
+aggregate metrics. Until that evidence exists, model quality remains preliminary.
+
 ## Current status
 
 - **Code verified:** 313 tests passing (1 by-design skip), Alembic migration
