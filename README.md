@@ -1,16 +1,30 @@
 # AFL Predict
 
-AFL Predict is a paper-trading research system for Australian Rules Football head-to-head match prediction. It brings together data collection, time-aware features, statistical models, walk-forward evaluation, and a FastAPI service with a local dashboard.
+AFL Predict is a paper-trading research system for Australian Rules Football head-to-head match prediction. It ingests fixtures, bookmaker odds, weather, and player data; builds time-aware pre-match features; trains Elo, logistic regression, XGBoost, and Poisson models against a bookmaker-implied baseline; evaluates them with walk-forward backtests; and serves predictions and paper-only recommendations through a FastAPI service and local dashboard. The research question is whether model probabilities add information beyond public bookmaker prices. Recommendations are paper-only analytics; the code does not place live-money wagers.
 
-The research question is whether model probabilities add information beyond public bookmaker prices. **This repository does not establish that they do.** Recommendations are paper-only analytics; the code does not place live-money wagers.
+[Local setup](#local-setup) · [Limitations](#limitations) · [Research evidence](docs/PORTFOLIO_FACTS.md) · [Backtesting method](docs/backtesting.md) · [CI](https://github.com/EdwardH-jedi/AFL_predict/actions/workflows/ci.yml)
 
-[Local setup](#local-setup) · [Research evidence and limitations](docs/PORTFOLIO_FACTS.md) · [Backtesting method](docs/backtesting.md) · [CI](https://github.com/EdwardH-jedi/AFL_predict/actions/workflows/ci.yml)
+## Engineering highlights
 
-## Status and what to review
+- **Leakage controls:** features are built only from pre-match data, with [timestamp leakage checks](features/validators.py) on every feature row
+- **Walk-forward backtests:** [expanding/rolling temporal splits](backtesting/splits.py) enforce train-before-test order, with [split tests](tests/test_splits.py); scored by Brier score, log loss, and calibration error
+- **Calibration:** per-model [isotonic calibration](models/calibrated_model.py) and [calibration-bin diagnostics](backtesting/calibration.py) feed a weighted ensemble
+- **Alembic migrations:** Alembic owns the schema; a [fresh-database smoke test](tests/test_alembic_fresh_db.py) checks the migration chain
+- **CI:** [GitHub Actions](.github/workflows/ci.yml) runs the pytest suite on Python 3.11 and a blocking Ruff lint on every pull request
 
-This is a research and engineering project, not a validated betting product. Historical performance snapshots cannot be reproduced from the repository alone because the underlying datasets, database, and backtest outputs are not bundled. The documented paper-trading history has no outcomes, and the recorded readiness assessment is `not_ready`.
+## Run it locally
 
-**T6 merge readiness: CLOSED at the code-verification level** (historical closeout, 2026-08-25, recorded in [T6_MERGE_READINESS.md](docs/T6_MERGE_READINESS.md)). That pass verified a clean committed tree, API route smoke tests, fresh-database migrations, and the readiness smoke check, and removed accidentally committed root artifacts (`=0.14`, `=0.44`, `=2.0`, `settings.json`), whose root-level patterns are now in `.gitignore`. It did **not** validate predictive performance: training and backtest reruns were not verifiable locally, and the evidence limitations below still apply.
+With Python 3.11 and an activated virtual environment, from the repository root:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m alembic upgrade head
+python -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
+
+Defaults use a local SQLite file with odds ingestion and Discord disabled. Open the [Quant Dashboard](http://127.0.0.1:8000/static/quant-dashboard/index.html) or the [API docs](http://127.0.0.1:8000/docs). See [Local setup](#local-setup) for the full walkthrough.
+
+## What to review
 
 Useful entry points:
 
@@ -28,7 +42,8 @@ Useful entry points:
 - **Paper operations:** recommendation generation with capped simulated stakes and abstention rules, pipeline retries, freshness checks, daily summaries, and a readiness report
 - **API and UI:** fixture, prediction, recommendation, and dashboard endpoints; optional Discord alerts/history and collector/predictor node roles
 
-Recommendation generation hard-codes `paper_trade=True`. Keep `PAPER_TRADE_ONLY=true`; changing an environment value does not turn this into a validated wagering system.
+
+Recommendation generation hard-codes `paper_trade=True`.
 
 ## Stack and architecture
 
@@ -120,15 +135,9 @@ python -m ruff check . --ignore E501
 
 The migration smoke test creates a temporary SQLite database and checks the Alembic chain and core tables; it does not migrate your working database. The broader suite covers API contracts, split/leakage assertions, metric implementations, and other regression behavior.
 
-The [current CI workflow](.github/workflows/ci.yml) runs pytest on Python 3.11 with an in-memory SQLite configuration. It does not run research ingestion/training, send Discord alerts, or establish predictive performance. CI also runs Ruff (blocking, with only `E501` deferred; see the workflow for the current count). Static-dashboard tests check asset responses and content, **not browser JavaScript execution**; CI does not establish UI correctness and end-to-end TAB persistence.
+**T6 merge readiness: CLOSED at the code-verification level** (historical closeout, 2026-08-25, recorded in [T6_MERGE_READINESS.md](docs/T6_MERGE_READINESS.md)). That pass verified a clean committed tree, API route smoke tests, fresh-database migrations, and the readiness smoke check, and removed accidentally committed root artifacts (`=0.14`, `=0.44`, `=2.0`, `settings.json`), whose root-level patterns are now in `.gitignore`.
 
-## Research limits
-
-1. **No valid market-outperformance result is established.** The historical bookmaker comparison had approximately zero odds coverage. Missing odds can fall back to probability 0.5, which is not a market quote. Any future market comparison needs actual timestamped prices, reported coverage, and the same eligible matches for every model.
-2. **Individual-model backtests do not validate the final ensemble.** Calibration and weighted ensembling are used in recommendation generation but are not yet evaluated through the same walk-forward backtest path.
-3. **Historical weather has look-ahead risk.** The feature path uses observed kickoff conditions rather than forecasts available before a match, creating an optimistic evaluation risk and train/serve mismatch. See the explicit exception in [Backtesting](docs/backtesting.md).
-4. **Reproduction needs external inputs.** Historical numbers in [ACCURACY_PLAN.md](docs/planning/ACCURACY_PLAN.md) are preliminary snapshots. A defensible comparison needs a versioned dataset/acquisition record, temporal splits, feature cutoffs, model configuration, per-match predictions, and aggregate metrics. None of the demo dashboard numbers fill that gap.
-5. **Scope is limited.** Research focuses on H2H markets and available data sources; the backtest simulation does not model closing-line movement. Readiness checks and simulated returns are not proof of profitable real-world execution.
+The [current CI workflow](.github/workflows/ci.yml) runs pytest on Python 3.11 with an in-memory SQLite configuration. CI also runs Ruff (blocking, with only `E501` deferred; see the workflow for the current count).
 
 ## Operations and development notes
 
@@ -159,3 +168,21 @@ The local preview above deliberately stops before ingestion or notifications. To
 ## License
 
 This project is released under the [MIT License](LICENSE).
+
+## Limitations
+
+This repository does not establish that model probabilities add information beyond public bookmaker prices.
+
+This is a research and engineering project, not a validated betting product. Historical performance snapshots cannot be reproduced from the repository alone because the underlying datasets, database, and backtest outputs are not bundled. The documented paper-trading history has no outcomes, and the recorded readiness assessment is `not_ready`.
+
+The T6 closeout did **not** validate predictive performance: training and backtest reruns were not verifiable locally, and the evidence limitations below still apply.
+
+Keep `PAPER_TRADE_ONLY=true`; changing an environment value does not turn this into a validated wagering system.
+
+CI does not run research ingestion/training, send Discord alerts, or establish predictive performance. Static-dashboard tests check asset responses and content, **not browser JavaScript execution**; CI does not establish UI correctness and end-to-end TAB persistence.
+
+1. **No valid market-outperformance result is established.** The historical bookmaker comparison had approximately zero odds coverage. Missing odds can fall back to probability 0.5, which is not a market quote. Any future market comparison needs actual timestamped prices, reported coverage, and the same eligible matches for every model.
+2. **Individual-model backtests do not validate the final ensemble.** Calibration and weighted ensembling are used in recommendation generation but are not yet evaluated through the same walk-forward backtest path.
+3. **Historical weather has look-ahead risk.** The feature path uses observed kickoff conditions rather than forecasts available before a match, creating an optimistic evaluation risk and train/serve mismatch. See the explicit exception in [Backtesting](docs/backtesting.md).
+4. **Reproduction needs external inputs.** Historical numbers in [ACCURACY_PLAN.md](docs/planning/ACCURACY_PLAN.md) are preliminary snapshots. A defensible comparison needs a versioned dataset/acquisition record, temporal splits, feature cutoffs, model configuration, per-match predictions, and aggregate metrics. None of the demo dashboard numbers fill that gap.
+5. **Scope is limited.** Research focuses on H2H markets and available data sources; the backtest simulation does not model closing-line movement. Readiness checks and simulated returns are not proof of profitable real-world execution.
