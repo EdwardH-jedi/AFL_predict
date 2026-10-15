@@ -42,11 +42,11 @@ def test_quant_dashboard_index_wires_live_data(client):
 
 
 def test_quant_dashboard_badge_distinguishes_demo_mixed_live(client):
-    """The data badge must never claim LIVE DATA while synthetic values remain."""
+    """The data badge must never claim LIVE DATA (KPI log loss and sparklines are always synthetic)."""
     live = client.get("/static/quant-dashboard/live-data.jsx").text
-    for label in ("DEMO DATA", "MIXED: some values synthetic", "LIVE DATA"):
+    for label in ("DEMO DATA", "MIXED: some values synthetic"):
         assert label in live, f"badge label missing: {label}"
-    assert "MOCK DATA" not in live
+    assert "LIVE DATA" not in live and "MOCK DATA" not in live
     # A successful predictions.json fetch alone must not mark cards as real.
     data = client.get("/static/quant-dashboard/data.jsx").text
     assert "jsonCards" in data

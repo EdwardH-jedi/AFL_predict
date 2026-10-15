@@ -236,11 +236,13 @@ function _ageLabel(hours) {
 }
 
 // DEMO: nothing real applied. MIXED: some real rows, rest still the bundled
-// synthetic data. LIVE: every data card overlaid (no code path does that yet).
-// A successful fetch alone never counts; only non-empty rows land in `applied`.
-function _dataMode(applied, loading, dataKeys) {
+// synthetic data. There is deliberately no "live" state: the KPI log-loss tile
+// and every sparkline are hard-coded/synthetic, so no overlay makes the whole
+// dashboard real. A successful fetch alone never counts; only non-empty rows
+// land in `applied`.
+function _dataMode(applied, loading) {
   if (!applied.length) return loading ? "LOADING" : "DEMO";
-  return dataKeys.some((k) => !applied.includes(k)) ? "MIXED" : "LIVE";
+  return "MIXED";
 }
 window.AFLLive.dataMode = _dataMode;
 
@@ -254,9 +256,7 @@ function LiveStatusBanner() {
 
   const s = window.AFLLive;
   const applied = s.liveCardsApplied || [];
-  // TEAMS is a static roster and rng a helper, not data cards.
-  const dataKeys = Object.keys(window.AFLData || {}).filter((k) => k !== "TEAMS" && k !== "rng");
-  const mode = _dataMode(applied, s.loading, dataKeys);
+  const mode = _dataMode(applied, s.loading);
   const errCount = Object.keys(s.errors || {}).length;
 
   // Compose pills
@@ -265,8 +265,8 @@ function LiveStatusBanner() {
   // Live vs Mock
   pills.push({
     key: "mode",
-    label: { LIVE: "LIVE DATA", MIXED: "MIXED: some values synthetic", DEMO: "DEMO DATA", LOADING: "LOADING…" }[mode],
-    tone: mode === "LIVE" ? "ok" : mode === "LOADING" ? "neutral" : "warn",
+    label: { MIXED: "MIXED: some values synthetic", DEMO: "DEMO DATA", LOADING: "LOADING…" }[mode],
+    tone: mode === "LOADING" ? "neutral" : "warn",
     detail: mode === "DEMO" ? "bundled synthetic dataset" :
             mode === "LOADING" ? "" : `real: ${applied.join(", ")}`,
   });

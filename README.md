@@ -102,7 +102,7 @@ Starting the API does not populate research data or run the daily ingestion pipe
 
 ### Dashboard provenance
 
-The recommended preview is `static/quant-dashboard/`, served by FastAPI. It initially renders synthetic demonstration data and selectively overlays available API data. The status banner badge reports the data mix: **`DEMO DATA`** means only the bundled synthetic dataset is showing (including when the API or `predictions.json` is empty or unreachable), **`MIXED: some values synthetic`** means some cards were overlaid with real rows while the rest (e.g. most chart series and some KPI values) remain synthetic fallbacks, and `LIVE DATA` is reserved for every card being backed by real rows, which the current overlay does not reach. Treat the UI as a prototype, not performance evidence, and inspect the underlying API/artifacts before interpreting numbers.
+The recommended preview is `static/quant-dashboard/`, served by FastAPI. It initially renders synthetic demonstration data and selectively overlays available API data. The status banner badge reports the data mix: **`DEMO DATA`** means only the bundled synthetic dataset is showing (including when the API or `predictions.json` is empty or unreachable), **`MIXED: some values synthetic`** means some cards were overlaid with real rows while the rest (e.g. most chart series and some KPI values) remain synthetic fallbacks. There is no `LIVE DATA` state because the KPI log-loss tile and all sparklines are always synthetic. Treat the UI as a prototype, not performance evidence, and inspect the underlying API/artifacts before interpreting numbers.
 
 The dashboard currently targets a wide desktop layout.
 
