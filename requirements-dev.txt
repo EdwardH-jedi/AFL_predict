@@ -18,5 +18,7 @@ pytest-asyncio>=0.23.0
 # ---------------------------------------------------------------------------
 # Code quality
 # ---------------------------------------------------------------------------
-ruff>=0.4.0
+# Pinned: CI's blocking rule subset (.github/workflows/ci.yml) was measured
+# with this version; re-measure the deferred rule list when bumping it.
+ruff==0.17.0
 mypy>=1.10.0
