@@ -32,4 +32,33 @@ jobs:
             requirements-dev.txt
       - run: python -m pip install -r requirements-dev.txt
       - name: Run regression tests including fresh database migrations
-        run: python -m pytest -q
+        run: python -m pytest tests/ -q
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Ruff needs no project deps; install only the ruff pin from requirements-dev.txt.
+      - run: python -m pip install "$(grep -E '^ruff==' requirements-dev.txt)"
+      # Blocking: every rule in pyproject's select = ["E", "F", "I", "UP"] that
+      # currently has zero findings (incl. I002 and correctness rules such as
+      # F821/F811/E711). Deferred codes below are pre-existing style debt from the
+      # T6 "Full validation baseline" (docs/T6_MERGE_READINESS.md); counts measured
+      # with ruff 0.17.0. Remove a code here once its findings are cleared.
+      #   UP017 62  datetime-timezone-utc        F401 41  unused-import
+      #   E501  38  line-too-long                I001 29  unsorted-imports
+      #   UP007 12  non-pep604-annotation-union  UP035  7  deprecated-import
+      #   F841   5  unused-variable              E712  4  true-false-comparison
+      #   UP037  3  quoted-annotation            E741  1  ambiguous-variable-name
+      - name: Ruff (blocking, currently passing rules)
+        run: python -m ruff check . --ignore E501,E712,E741,F401,F841,I001,UP007,UP017,UP035,UP037
+      # Non-blocking: full rule set, so the deferred debt stays visible on every run.
+      - name: Ruff (non-blocking, full debt report)
+        if: always()
+        run: |
+          python -m ruff check . --exit-zero
+          { echo '### Ruff debt (non-blocking)'; echo '```'; python -m ruff check . --exit-zero --statistics; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
