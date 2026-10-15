@@ -60,8 +60,10 @@ its PR, not restated here.
 
 - `tests` job: `python -m pytest tests/ -q` on Python 3.11 — blocking.
 - `lint` job, blocking: `python -m ruff check . --ignore
-  E501,E712,E741,F401,F841,I001,UP007,UP017,UP035,UP037` — every selected
-  (`E`, `F`, `I`, `UP`) rule with zero findings is gated.
+  E501,E712,E741,F401,F841,I001,UP007,UP017,UP035,UP037` — gates every
+  selected (`E`, `F`, `I`, `UP`) rule that had zero findings at the #3 /
+  main `c3bee0c` baseline. On this branch UP017 and F401 also reach zero but
+  stay in the ignore list until the follow-up below.
 - `lint` job, non-blocking: `python -m ruff check . --exit-zero --statistics`
   — full debt report in the job summary.
 
@@ -125,9 +127,9 @@ on both trees:
    depends on the resolved package versions, which is why other environments
    (e.g. a Python 3.12.10 env reporting 2 warnings) can count differently.
 
-Related open PR: #4 (OPEN at `53c1993`) updates README to match these CI
-gates. README's "Ruff is a separate local check" wording is stale since #3
-and is owned by #4.
+Related open PR: README on main `c3bee0c` still says "Ruff is a separate
+local check", which is stale since #3. #4 (OPEN, pending, at `53c1993`)
+removes that sentence; this PR does not touch README.
 
 ## Issues found and fixed in this pass
 
