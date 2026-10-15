@@ -1,7 +1,7 @@
 """api/routes/fixtures.py — Upcoming and past match fixture endpoints."""
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from api.dependencies import DbSession
 from db.models.matches import Match
@@ -10,6 +10,8 @@ router = APIRouter()
 
 
 class FixtureOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     season: int
     round_number: int
@@ -19,9 +21,6 @@ class FixtureOut(BaseModel):
     venue: str | None
     match_time: str | None
     result: str | None
-
-    class Config:
-        from_attributes = True
 
 
 @router.get("/", response_model=list[FixtureOut], summary="List fixtures")
