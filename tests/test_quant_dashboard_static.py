@@ -47,6 +47,7 @@ def test_quant_dashboard_badge_distinguishes_demo_mixed_live(client):
     for label in ("DEMO DATA", "MIXED: some values synthetic"):
         assert label in live, f"badge label missing: {label}"
     assert "LIVE DATA" not in live and "MOCK DATA" not in live
+    assert "LOADING…" not in live  # synthetic data is painted while loading: still DEMO
     # A successful predictions.json fetch alone must not mark cards as real.
     data = client.get("/static/quant-dashboard/data.jsx").text
     assert "jsonCards" in data
