@@ -34,6 +34,11 @@ build/
 # Claude Code local settings
 .claude/
 
+# Accidental root artifacts (T6 item 3): pip output files from unquoted `>=`
+# specifiers in PowerShell, and a root-level local tool settings file
+/=*
+/settings.json
+
 # generated artifacts
 reviews/
 data/

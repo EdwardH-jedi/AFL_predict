@@ -10,6 +10,8 @@ The research question is whether model probabilities add information beyond publ
 
 This is a research and engineering project, not a validated betting product. Historical performance snapshots cannot be reproduced from the repository alone because the underlying datasets, database, and backtest outputs are not bundled. The documented paper-trading history has no outcomes, and the recorded readiness assessment is `not_ready`.
 
+**T6 merge readiness: CLOSED at the code-verification level** (historical closeout, 2026-08-25, recorded in [T6_MERGE_READINESS.md](docs/T6_MERGE_READINESS.md)). That pass verified a clean committed tree, API route smoke tests, fresh-database migrations, and the readiness smoke check, and removed accidentally committed root artifacts (`=0.14`, `=0.44`, `=2.0`, `settings.json`), whose root-level patterns are now in `.gitignore`. It did **not** validate predictive performance: training and backtest reruns were not verifiable locally, and the evidence limitations below still apply.
+
 Useful entry points:
 
 - [Temporal splits](backtesting/splits.py) and [split tests](tests/test_splits.py) show how training-before-test order is enforced
