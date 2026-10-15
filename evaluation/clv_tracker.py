@@ -31,9 +31,9 @@ Public API:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Sequence
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -41,7 +41,6 @@ from sqlalchemy.orm import Session
 from db.models.odds_snapshots import OddsSnapshot
 from db.models.predictions import Prediction
 from db.models.recommendations import Recommendation
-
 
 # ---------------------------------------------------------------------------
 # Data structures

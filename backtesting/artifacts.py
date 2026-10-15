@@ -19,14 +19,13 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
 from loguru import logger
 
 from backtesting.bootstrap import BootstrapCI, bootstrap_metrics, format_ci
-from backtesting.metrics import WindowMetrics
 
 
 @dataclass
@@ -63,11 +62,11 @@ class BacktestResult:
     # ---------------------------------------------------------------------------
 
     @classmethod
-    def new(cls, mode: str, min_train_seasons: int) -> "BacktestResult":
+    def new(cls, mode: str, min_train_seasons: int) -> BacktestResult:
         """Create a fresh BacktestResult for a new run."""
         return cls(
             run_id=str(uuid.uuid4()),
-            run_at=datetime.now(tz=timezone.utc).isoformat(),
+            run_at=datetime.now(tz=UTC).isoformat(),
             mode=mode,
             min_train_seasons=min_train_seasons,
             n_folds=0,
@@ -91,7 +90,7 @@ class BacktestResult:
             Path to the written file.
         """
         output_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        ts = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
         filename = f"backtest_{self.run_id[:8]}_{ts}.json"
         path = output_dir / filename
         with open(path, "w", encoding="utf-8") as f:
@@ -100,7 +99,7 @@ class BacktestResult:
         return path
 
     @classmethod
-    def load(cls, path: Path) -> "BacktestResult":
+    def load(cls, path: Path) -> BacktestResult:
         """Load a BacktestResult from a JSON file."""
         with open(path, encoding="utf-8") as f:
             data = json.load(f)

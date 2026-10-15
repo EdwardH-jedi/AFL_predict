@@ -9,18 +9,17 @@ Match-like objects.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
 
 from features.extractors.elo import (
-    EloExtractor,
     _START_ELO,
+    EloExtractor,
     _expected_win,
     _outcome,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers — minimal Match-like objects
@@ -47,7 +46,7 @@ def _match(
         result=result,
         home_score=home_score,
         away_score=away_score,
-        match_time=match_time or datetime(2025, 1, 1, tzinfo=timezone.utc),
+        match_time=match_time or datetime(2025, 1, 1, tzinfo=UTC),
         is_final=False,
         venue=None,
     )

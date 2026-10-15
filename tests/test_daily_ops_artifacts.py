@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -13,7 +13,7 @@ from db.models.pipeline_runs import PipelineRun
 def test_upcoming_without_odds_focuses_on_actionable_window(db_session):
     from orchestration.jobs.check_data_freshness import _upcoming_without_odds
 
-    now = datetime(2026, 4, 18, 3, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 4, 18, 3, 0, tzinfo=UTC)
     soon_match = Match(
         season=2026,
         round_number=7,
@@ -79,8 +79,8 @@ def test_pipeline_status_uses_final_persisted_job_states(db_session):
         run_date=today,
         triggered_by="cron",
         status="success",
-        started_at=datetime(2026, 4, 18, 3, 21, tzinfo=timezone.utc),
-        completed_at=datetime(2026, 4, 18, 3, 22, tzinfo=timezone.utc),
+        started_at=datetime(2026, 4, 18, 3, 21, tzinfo=UTC),
+        completed_at=datetime(2026, 4, 18, 3, 22, tzinfo=UTC),
         duration_seconds=13.5,
     )
     db_session.add(daily_run)

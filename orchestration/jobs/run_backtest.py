@@ -21,22 +21,20 @@ CLI usage:
 """
 
 import argparse
+import json
 import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 from loguru import logger
 
 from backtesting.runner import BacktestRunner
 from config.settings import get_settings
-import json
-
 from models.bookmaker_baseline import BookmakerBaseline
 from models.elo_baseline import EloBaseline
 from models.logistic_baseline import LogisticBaseline
-from models.xgboost_model import XGBoostModel
 from models.poisson_model import PoissonModel
+from models.xgboost_model import XGBoostModel
 
 settings = get_settings()
 FEATURES_DIR = Path(settings.raw_snapshots_dir) / "features"

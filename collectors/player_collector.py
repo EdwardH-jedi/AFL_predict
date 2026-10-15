@@ -33,7 +33,6 @@ import csv
 import io
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 
 import httpx
 from loguru import logger
@@ -323,9 +322,6 @@ class PlayerCollector:
 
                 # Normalise: top-22 by prior score represent "expected" team
                 player_prior_scores.sort(reverse=True)
-                actual_top22 = sum(player_prior_scores[:22])
-                # Estimate what a "full 22" should contribute (top-22 from last season avg)
-                expected = actual_top22  # by definition they all played -> 1.0
 
                 avail = 1.0  # if we have actual lineups, all listed played
                 key_absent = 0  # no absences when we have actual data

@@ -39,7 +39,7 @@ Expected response shape per event:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -291,7 +291,7 @@ def _parse_iso_datetime(raw: str | None, context: str) -> datetime:
         # Handle both 'Z' suffix and '+00:00'
         dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
     except (ValueError, AttributeError) as exc:
         raise ValueError(f"Cannot parse datetime {raw!r} in {context}: {exc}") from exc

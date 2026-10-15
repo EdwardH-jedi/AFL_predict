@@ -8,13 +8,12 @@ No network calls, no database — pure function testing.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
 
-from features.extractors.form import FormExtractor, _DEFAULT_WINDOW
-
+from features.extractors.form import _DEFAULT_WINDOW, FormExtractor
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -39,7 +38,7 @@ def _match(
         result=result,
         home_score=home_score,
         away_score=away_score,
-        match_time=datetime(2025, 1, round_number, tzinfo=timezone.utc),
+        match_time=datetime(2025, 1, round_number, tzinfo=UTC),
         is_final=False,
         venue=None,
     )

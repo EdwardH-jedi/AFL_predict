@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from db.models.model_runs import ModelRun
 
@@ -15,7 +15,7 @@ def _completed_run(model_name: str, **kwargs) -> ModelRun:
     defaults = {
         "model_version": "0.1",
         "status": "completed",
-        "completed_at": datetime.now(tz=timezone.utc),
+        "completed_at": datetime.now(tz=UTC),
         "brier_score": 0.2,
     }
     defaults.update(kwargs)

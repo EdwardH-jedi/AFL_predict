@@ -1,6 +1,6 @@
 """api/routes/health.py — Health check endpoints."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -37,7 +37,7 @@ def health_check(db: DbSession) -> HealthResponse:
     return HealthResponse(
         status="ok" if db_ok else "degraded",
         app_env=settings.app_env,
-        timestamp=datetime.now(tz=timezone.utc),
+        timestamp=datetime.now(tz=UTC),
         db_ok=db_ok,
         paper_trade_only=settings.paper_trade_only,
     )

@@ -25,7 +25,7 @@ CLI usage:
 import argparse
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from loguru import logger
 from sqlalchemy import func
@@ -78,12 +78,12 @@ def run(dry_run: bool = False, snapshot_only: bool = False) -> None:
                 collector.fetch_upcoming_h2h()
                 logger.info("==> ingest_tab_odds: snapshot saved, exiting (snapshot_only=True).")
                 run_record.status = "completed"
-                run_record.completed_at = datetime.now(tz=timezone.utc)
+                run_record.completed_at = datetime.now(tz=UTC)
                 run_record.duration_seconds = round(time.monotonic() - start, 2)
                 return
 
             events = collector.fetch_upcoming_h2h()
-            snapshot_time = datetime.now(tz=timezone.utc)
+            snapshot_time = datetime.now(tz=UTC)
             records_written = 0
             records_skipped = 0
 
@@ -129,7 +129,7 @@ def run(dry_run: bool = False, snapshot_only: bool = False) -> None:
 
             duration = time.monotonic() - start
             run_record.status = "completed"
-            run_record.completed_at = datetime.now(tz=timezone.utc)
+            run_record.completed_at = datetime.now(tz=UTC)
             run_record.duration_seconds = round(duration, 2)
             run_record.records_processed = records_written
             logger.info(

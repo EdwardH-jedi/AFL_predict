@@ -6,9 +6,7 @@ Unit tests for the collectors/validators/ layer.
 No network calls, no database — pure function testing.
 """
 
-from datetime import datetime, timezone
-
-import pytest
+from datetime import UTC, datetime
 
 from collectors.parsers.odds_parser import ParsedOddsEvent
 from collectors.parsers.squiggle_parser import ParsedGame, ParsedTeam
@@ -18,7 +16,6 @@ from collectors.validators.afl_validator import (
     validate_team,
 )
 from collectors.validators.odds_validator import validate_odds_event
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -34,7 +31,7 @@ def _game(**overrides) -> ParsedGame:
         away_team_name="Carlton",
         home_team_external_id="14",
         away_team_external_id="3",
-        match_time=datetime(2025, 5, 1, 9, 30, tzinfo=timezone.utc),
+        match_time=datetime(2025, 5, 1, 9, 30, tzinfo=UTC),
         venue="MCG",
         home_score=None,
         away_score=None,
@@ -64,12 +61,12 @@ def _odds_event(**overrides) -> ParsedOddsEvent:
         external_event_id="event-abc",
         home_team_name="Richmond",
         away_team_name="Carlton",
-        commence_time=datetime(2025, 5, 1, 9, 30, tzinfo=timezone.utc),
+        commence_time=datetime(2025, 5, 1, 9, 30, tzinfo=UTC),
         bookmaker_key="tab",
         bookmaker_title="TAB",
         home_odds=1.75,
         away_odds=2.10,
-        odds_last_update=datetime(2025, 4, 30, 22, 0, tzinfo=timezone.utc),
+        odds_last_update=datetime(2025, 4, 30, 22, 0, tzinfo=UTC),
     )
     for k, v in overrides.items():
         object.__setattr__(base, k, v)
