@@ -38,3 +38,8 @@ build/
 reviews/
 data/
 static/quant-dashboard/predictions.json
+
+# Runtime logs (keep the directory itself: ops scripts redirect into logs\)
+logs/*
+!logs/.gitkeep
+*.log

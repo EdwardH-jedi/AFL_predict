@@ -380,8 +380,14 @@ async function _loadPredictionsJson() {
       n_today: summary.total_bets_today ?? null,
       bet_total_today: summary.total_amount ?? null,
     };
+    // Flag only cards backed by real rows; an empty games[] / zero-prediction
+    // file is a successful fetch but not real data.
+    const jsonCards = [];
+    if (picks.length) jsonCards.push("PICKS");
+    if (perf.total_predictions > 0) jsonCards.push("performance");
+    window.AFLLive.jsonCards = jsonCards;
     window.AFLLive.liveCardsApplied = Array.from(
-      new Set([...(window.AFLLive.liveCardsApplied || []), "PICKS", "performance"]),
+      new Set([...(window.AFLLive.liveCardsApplied || []), ...jsonCards]),
     );
     window.AFLLive.loading = false;
 

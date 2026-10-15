@@ -51,7 +51,7 @@ training/recommendation path, not (yet) inside the backtest runner.
 
 **Important limitations (stated deliberately).**
 - **No claim that any model beats bookmaker prices.** The one recorded
-  bookmaker-baseline comparison (`ACCURACY_PLAN.md`, 2026-04-10) was computed
+  bookmaker-baseline comparison (`docs/planning/ACCURACY_PLAN.md`, 2026-04-10) was computed
   with ~0% odds coverage in training data and is not a valid market
   comparison.
 - Historical metric snapshots (e.g. logistic Brier 0.183 / 69% accuracy) are

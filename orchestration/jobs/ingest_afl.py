@@ -21,7 +21,7 @@ CLI usage:
 import argparse
 import sys
 import time
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -117,7 +117,7 @@ def run(season: int | None = None, round_number: int | None = None) -> None:
 
             duration = time.monotonic() - start
             run_record.status = "completed"
-            run_record.completed_at = datetime.now(tz=timezone.utc)
+            run_record.completed_at = datetime.now(tz=UTC)
             run_record.duration_seconds = round(duration, 2)
             run_record.records_processed = match_count
             logger.info(

@@ -178,6 +178,9 @@ async function _refresh() {
   const D = window.AFLData;
   const applied = [];
 
+  // KPI strip overlay counts only when the API reported at least one bet.
+  if (performance?.summary?.total_bets > 0) applied.push("performance");
+
   const picks = _adaptPicks(performance, recommendations);
   if (picks && picks.length) {
     D.PICKS = picks;
@@ -202,7 +205,9 @@ async function _refresh() {
     applied.push("MODEL_VERSIONS");
   }
 
-  STATUS.liveCardsApplied = applied;
+  // Keep cards already overlaid from predictions.json (data.jsx) so the badge
+  // doesn't depend on which of the two fetches resolves last.
+  STATUS.liveCardsApplied = Array.from(new Set([...(STATUS.jsonCards || []), ...applied]));
   STATUS.loading = false;
 
   // Notify the React tree.
@@ -230,6 +235,15 @@ function _ageLabel(hours) {
   return `${(hours / 24).toFixed(1)}d`;
 }
 
+// DEMO: nothing real applied. MIXED: some real rows, rest still the bundled
+// synthetic data. LIVE: every data card overlaid (no code path does that yet).
+// A successful fetch alone never counts; only non-empty rows land in `applied`.
+function _dataMode(applied, loading, dataKeys) {
+  if (!applied.length) return loading ? "LOADING" : "DEMO";
+  return dataKeys.some((k) => !applied.includes(k)) ? "MIXED" : "LIVE";
+}
+window.AFLLive.dataMode = _dataMode;
+
 function LiveStatusBanner() {
   const [, force] = React.useState(0);
   React.useEffect(() => {
@@ -240,7 +254,9 @@ function LiveStatusBanner() {
 
   const s = window.AFLLive;
   const applied = s.liveCardsApplied || [];
-  const isLive = applied.length > 0;
+  // TEAMS is a static roster and rng a helper, not data cards.
+  const dataKeys = Object.keys(window.AFLData || {}).filter((k) => k !== "TEAMS" && k !== "rng");
+  const mode = _dataMode(applied, s.loading, dataKeys);
   const errCount = Object.keys(s.errors || {}).length;
 
   // Compose pills
@@ -249,9 +265,10 @@ function LiveStatusBanner() {
   // Live vs Mock
   pills.push({
     key: "mode",
-    label: isLive ? "LIVE DATA" : (s.loading ? "LOADING…" : "MOCK DATA"),
-    tone: isLive ? "ok" : (s.loading ? "neutral" : "warn"),
-    detail: isLive ? `overlay: ${applied.join(", ")}` : "demo dataset",
+    label: { LIVE: "LIVE DATA", MIXED: "MIXED: some values synthetic", DEMO: "DEMO DATA", LOADING: "LOADING…" }[mode],
+    tone: mode === "LIVE" ? "ok" : mode === "LOADING" ? "neutral" : "warn",
+    detail: mode === "DEMO" ? "bundled synthetic dataset" :
+            mode === "LOADING" ? "" : `real: ${applied.join(", ")}`,
   });
 
   // Freshness

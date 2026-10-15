@@ -15,13 +15,11 @@ import pandas as pd
 import pytest
 
 from backtesting.calibration import (
-    CalibrationBin,
     calibration_bins,
     expected_calibration_error,
     format_calibration_report,
 )
 from backtesting.metrics import WindowMetrics, aggregate_metrics, compute_metrics
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -198,7 +196,6 @@ class TestComputeMetrics:
     def test_roi_computed_correctly(self):
         # 5 bets at 50% win rate, stake=0.04, odds=2.0 → profit = 0 each on average
         bets = self._make_bets(10, win_rate=0.5, stake=0.04, odds=2.0)
-        n_wins = bets["won"].sum()
         total_profit = bets["profit"].sum()
         expected_roi = total_profit / (10 * 0.04)
 

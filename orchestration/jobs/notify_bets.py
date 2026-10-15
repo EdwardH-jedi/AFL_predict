@@ -32,7 +32,7 @@ Design:
 from __future__ import annotations
 
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -100,7 +100,7 @@ def notify_bets(db: Session | None = None) -> bool:
 def _load_todays_picks(db: Session) -> list[dict]:
     """Load pending recommendations for matches happening today (by match_time)."""
     today = date.today()
-    start = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+    start = datetime(today.year, today.month, today.day, tzinfo=UTC)
     end = start + timedelta(days=1)
 
     recs = (
@@ -154,7 +154,6 @@ def _format_message(picks: list[dict]) -> str:
     """Build the Discord message string."""
     today_str = date.today().strftime("%a %d %b")
     sep = "=" * 32
-    div = "-" * 32
     mode_label = "PAPER TRADE" if picks[0]["paper_trade"] else "LIVE"
 
     lines = [
@@ -169,7 +168,7 @@ def _format_message(picks: list[dict]) -> str:
         if p["match_time"]:
             mt = p["match_time"]
             if mt.tzinfo is None:
-                mt = mt.replace(tzinfo=timezone.utc)
+                mt = mt.replace(tzinfo=UTC)
             mt_aest = mt.astimezone(_AEST)
             match_time_str = mt_aest.strftime("%a %d %b %I:%M%p")
         else:

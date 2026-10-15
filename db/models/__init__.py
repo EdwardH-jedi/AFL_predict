@@ -1,5 +1,6 @@
 # Import all models here so SQLAlchemy registers them against Base.metadata.
 # Order matters: DailyPipelineRun must precede PipelineRun (FK dependency).
+# isort: skip_file
 from db.models.daily_pipeline_runs import DailyPipelineRun
 from db.models.teams import Team
 from db.models.matches import Match

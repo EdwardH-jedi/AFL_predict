@@ -17,7 +17,7 @@ UTC offset; those are parsed directly without going through this module.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 # Australia/Melbourne handles both AEST (UTC+10) and AEDT (UTC+11)
@@ -44,7 +44,7 @@ def squiggle_local_to_utc(raw_date: str) -> datetime:
     # Only use the first 19 characters to safely ignore any trailing chars
     naive = datetime.strptime(raw_date[:19], SQUIGGLE_DATE_FORMAT)
     local = naive.replace(tzinfo=MELBOURNE_TZ)
-    return local.astimezone(timezone.utc)
+    return local.astimezone(UTC)
 
 
 def parse_iso_utc(raw: str) -> datetime:
@@ -67,4 +67,4 @@ def parse_iso_utc(raw: str) -> datetime:
     if raw.endswith("Z"):
         raw = raw[:-1] + "+00:00"
     dt = datetime.fromisoformat(raw)
-    return dt.astimezone(timezone.utc)
+    return dt.astimezone(UTC)

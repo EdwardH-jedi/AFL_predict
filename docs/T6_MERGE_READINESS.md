@@ -24,7 +24,7 @@ docs must not — and now do not — claim verified predictive performance. See
 | Route smoke test for new API endpoints | **Verified** | TestClient-based suites pass: `test_health.py`, `test_dashboard_contract.py`, `test_quant_dashboard_static.py` (part of the 313-passing run below) |
 | Migration application on a clean database | **Verified** | `tests/test_alembic_fresh_db.py` passes; additionally `alembic upgrade head` (0000→0008) ran clean against a throwaway SQLite DB |
 | `train_models` rerun on final feature set | **Not verifiable locally** | Requires ingested historical data (external APIs); no dataset is bundled. Docs no longer rest any claim on a prior training run |
-| `run_backtest` / evaluation rerun | **Not verifiable locally** | Same data dependency; `storage/backtest_results/` contains no artifacts. Performance tables in `ACCURACY_PLAN.md` are now explicitly caveated as unreproduced historical snapshots |
+| `run_backtest` / evaluation rerun | **Not verifiable locally** | Same data dependency; `storage/backtest_results/` contains no artifacts. Performance tables in `docs/planning/ACCURACY_PLAN.md` are now explicitly caveated as unreproduced historical snapshots |
 | `make readiness` on the final tree | **Verified (smoke)** | `python -m evaluation.live_readiness` runs end-to-end against a fresh DB and correctly reports `not_ready` (insufficient samples, TAB bookmaker unconfirmed) — the expected result with no betting history |
 | `.env.example` matches dual-machine model | **Verified** | `NODE_ROLE` present with `standalone`/`collector`/`predictor` semantics documented in `config/settings.py` and `CLAUDE.md` |
 
@@ -73,7 +73,7 @@ Found by the independent (Codex) review of this pass and fixed:
    deviation"), the extractor docstring, README, and PORTFOLIO_FACTS; the
    code path itself is unchanged (fixing it needs forecast-issued-at
    snapshots and is future work).
-6. Doc-accuracy corrections: `ACCURACY_PLAN.md` marked as a historical
+6. Doc-accuracy corrections: `docs/planning/ACCURACY_PLAN.md` marked as a historical
    planning document (its "missing" items have since been implemented), and
    README/PORTFOLIO_FACTS wording corrected so the backtest is described as
    evaluating individual models (the calibrated ensemble used in production
@@ -93,7 +93,7 @@ deliberately. They are historical records and should not be edited to
 - **No performance claim in this repository is independently reproducible from
   the repository contents alone.** Regenerating metrics requires re-ingesting
   data from external APIs (Squiggle, The Odds API, Open-Meteo, AFL Tables).
-- The bookmaker-baseline figures recorded in `ACCURACY_PLAN.md` were computed
+- The bookmaker-baseline figures recorded in `docs/planning/ACCURACY_PLAN.md` were computed
   when odds coverage in training data was ~0%, so they are not a valid market
   comparison; the repository makes **no claim of beating bookmaker prices**.
 - The paper-trading log (`storage/paper_trading_log.md`) contains no entries:

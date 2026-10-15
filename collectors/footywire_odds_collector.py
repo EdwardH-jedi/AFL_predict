@@ -13,9 +13,8 @@ NOTE: This scraper uses a 2-second politeness delay between requests.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Iterator
+from collections.abc import Iterator
+from dataclasses import dataclass
 
 import httpx
 from bs4 import BeautifulSoup
@@ -174,7 +173,7 @@ class FootywireOddsCollector:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> "FootywireOddsCollector":
+    def __enter__(self) -> FootywireOddsCollector:
         return self
 
     def __exit__(self, *_: object) -> None:

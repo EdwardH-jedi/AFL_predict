@@ -39,3 +39,14 @@ def test_quant_dashboard_index_wires_live_data(client):
     body = response.text
     assert "live-data.jsx" in body, "live-data overlay script is not wired into index.html"
     assert "app.jsx" in body, "app.jsx entry script is not wired into index.html"
+
+
+def test_quant_dashboard_badge_distinguishes_demo_mixed_live(client):
+    """The data badge must never claim LIVE DATA while synthetic values remain."""
+    live = client.get("/static/quant-dashboard/live-data.jsx").text
+    for label in ("DEMO DATA", "MIXED: some values synthetic", "LIVE DATA"):
+        assert label in live, f"badge label missing: {label}"
+    assert "MOCK DATA" not in live
+    # A successful predictions.json fetch alone must not mark cards as real.
+    data = client.get("/static/quant-dashboard/data.jsx").text
+    assert "jsonCards" in data

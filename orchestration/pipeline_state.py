@@ -14,7 +14,7 @@ Keeps all state logic here so daily_pipeline.py stays readable.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from loguru import logger

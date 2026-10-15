@@ -52,7 +52,7 @@ Every model inherits `BaseModel` (`models/base_model.py`), an ABC whose contract
 **Abstention** — no bet when: both sides' edge < 3%; odds missing for the chosen side; Kelly ≤ 0 (negative edge); or implied-prob columns absent.
 
 **Confidence banding — two independent schemes:**
-- *Edge-based* (React dashboard, `frontend/src/lib/confidence.ts`): ≥0.08 strong 🔥 / ≥0.05 moderate / ≥0.03 marginal / else none
+- *Edge-based* (former Vite React dashboard, since removed from the repo): ≥0.08 strong 🔥 / ≥0.05 moderate / ≥0.03 marginal / else none
 - *Probability-based* (static quant dashboard, `generate_predictions_json.py`): distance from coin-flip → ≥0.65 HIGH / ≥0.55 MED / else LOW
 
 **CLV (Closing Line Value)** — `evaluation/clv_tracker.py`: `clv = (1/closing_odds) − (1/bet_odds)`; positive = beat the close. Closing odds = latest `OddsSnapshot` before match time. Reports `beat_closing_line` %, avg/median CLV. *(Uses raw single-side reciprocals, not de-vigged.)* Cited as the primary long-term profitability signal.
@@ -132,7 +132,7 @@ All subclass `BaseExtractor`, return `{match_id: {feature: value}}`, and enforce
 
 **Notifications** — Discord: outbound webhook (`notify_bets.py`, httpx + retry, gated by `discord_enabled`) and inbound read-back (`discord_reader.py`, bot token, regex-parses posted picks). Never places bets.
 
-**Frontend serving** — legacy `static/dashboard.html` + `static/quant-dashboard/` (CDN React-in-JSX), plus a `frontend/` **Vite + React 18 + TypeScript + Tailwind + recharts + SWR** scaffold (dev-proxies `/api` and `/dashboard` to :8000). Standalone preview via `serve.py` (stdlib http.server, :8080).
+**Frontend serving** — legacy `static/dashboard.html` + `static/quant-dashboard/` (CDN React-in-JSX); the former `frontend/` Vite scaffold has been removed. Standalone preview via `serve.py` (stdlib http.server, :8080).
 
 **Quality** — **pytest** + pytest-asyncio (`asyncio_mode=auto`), **ruff** (line 100, py311, `E,F,I,UP`), **mypy** (py311, non-strict). ML/analytics libs: scikit-learn, statsmodels, scipy, shap, joblib, pandas, numpy, pyarrow, matplotlib.
 

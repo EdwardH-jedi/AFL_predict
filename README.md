@@ -36,7 +36,6 @@ Recommendation generation hard-codes `paper_trade=True`. Keep `PAPER_TRADE_ONLY=
 | Database | SQLite for local development; PostgreSQL configuration supported |
 | Research | pandas, pyarrow, scikit-learn, XGBoost, statsmodels |
 | Served dashboard | React/JSX static assets mounted by FastAPI, with CDN-loaded runtime dependencies |
-| Experimental frontend | Separate React/TypeScript/Vite workspace in `frontend/` |
 | Checks | pytest and local Ruff tooling; current CI runs the Python regression suite |
 
 Data flows from `collectors/` through `features/` and `models/`, then into predictions, paper recommendations, evaluation, and API responses. `orchestration/` coordinates jobs and summaries. Alembic owns database schema changes.
@@ -103,9 +102,9 @@ Starting the API does not populate research data or run the daily ingestion pipe
 
 ### Dashboard provenance
 
-The recommended preview is `static/quant-dashboard/`, served by FastAPI. It initially renders synthetic demonstration data and selectively overlays available API data. **A `LIVE DATA` badge does not mean every card or chart is backed by real observations.** Some KPI values and chart series remain synthetic fallbacks. Treat the UI as a prototype, not performance evidence, and inspect the underlying API/artifacts before interpreting numbers.
+The recommended preview is `static/quant-dashboard/`, served by FastAPI. It initially renders synthetic demonstration data and selectively overlays available API data. The status banner badge reports the data mix: **`DEMO DATA`** means only the bundled synthetic dataset is showing (including when the API or `predictions.json` is empty or unreachable), **`MIXED: some values synthetic`** means some cards were overlaid with real rows while the rest (e.g. most chart series and some KPI values) remain synthetic fallbacks, and `LIVE DATA` is reserved for every card being backed by real rows, which the current overlay does not reach. Treat the UI as a prototype, not performance evidence, and inspect the underlying API/artifacts before interpreting numbers.
 
-The dashboard currently targets a wide desktop layout. `frontend/` is a separate experimental Vite app whose entry point is a JSON-oriented scaffold; its other page components are not all connected. It is not the dashboard served at the URL above. Its scripts live in [`frontend/package.json`](frontend/package.json).
+The dashboard currently targets a wide desktop layout.
 
 ## Tests and verification
 
@@ -114,19 +113,19 @@ With the Python environment active, from the repository root:
 ```bash
 python -m pytest -q
 python -m pytest tests/test_alembic_fresh_db.py -v
-python -m ruff check .
+python -m ruff check . --ignore E501
 ```
 
 The migration smoke test creates a temporary SQLite database and checks the Alembic chain and core tables; it does not migrate your working database. The broader suite covers API contracts, split/leakage assertions, metric implementations, and other regression behavior.
 
-The [current CI workflow](.github/workflows/ci.yml) runs pytest on Python 3.11 with an in-memory SQLite configuration. It does not run research ingestion/training, send Discord alerts, or establish predictive performance. Ruff is a separate local check. Static-dashboard tests check asset responses and content, **not browser JavaScript execution**; CI does not currently build/test the Vite UI or establish UI correctness and end-to-end TAB persistence.
+The [current CI workflow](.github/workflows/ci.yml) runs pytest on Python 3.11 with an in-memory SQLite configuration. It does not run research ingestion/training, send Discord alerts, or establish predictive performance. CI also runs Ruff (blocking, with only `E501` deferred; see the workflow for the current count). Static-dashboard tests check asset responses and content, **not browser JavaScript execution**; CI does not establish UI correctness and end-to-end TAB persistence.
 
 ## Research limits
 
 1. **No valid market-outperformance result is established.** The historical bookmaker comparison had approximately zero odds coverage. Missing odds can fall back to probability 0.5, which is not a market quote. Any future market comparison needs actual timestamped prices, reported coverage, and the same eligible matches for every model.
 2. **Individual-model backtests do not validate the final ensemble.** Calibration and weighted ensembling are used in recommendation generation but are not yet evaluated through the same walk-forward backtest path.
 3. **Historical weather has look-ahead risk.** The feature path uses observed kickoff conditions rather than forecasts available before a match, creating an optimistic evaluation risk and train/serve mismatch. See the explicit exception in [Backtesting](docs/backtesting.md).
-4. **Reproduction needs external inputs.** Historical numbers in [ACCURACY_PLAN.md](ACCURACY_PLAN.md) are preliminary snapshots. A defensible comparison needs a versioned dataset/acquisition record, temporal splits, feature cutoffs, model configuration, per-match predictions, and aggregate metrics. None of the demo dashboard numbers fill that gap.
+4. **Reproduction needs external inputs.** Historical numbers in [ACCURACY_PLAN.md](docs/planning/ACCURACY_PLAN.md) are preliminary snapshots. A defensible comparison needs a versioned dataset/acquisition record, temporal splits, feature cutoffs, model configuration, per-match predictions, and aggregate metrics. None of the demo dashboard numbers fill that gap.
 5. **Scope is limited.** Research focuses on H2H markets and available data sources; the backtest simulation does not model closing-line movement. Readiness checks and simulated returns are not proof of profitable real-world execution.
 
 ## Operations and development notes
@@ -152,10 +151,9 @@ The local preview above deliberately stops before ingestion or notifications. To
 | [`api/`](api/) | FastAPI application and routes |
 | [`db/`](db/) | SQLAlchemy models, sessions, and migrations |
 | [`static/quant-dashboard/`](static/quant-dashboard/) | Served prototype dashboard |
-| [`frontend/`](frontend/) | Experimental Vite app |
-| [`config/`](config/), [`tests/`](tests/), [`docs/`](docs/), [`ops/`](ops/) | Settings, regression tests, research documentation, and runbooks |
+| [`config/`](config/), [`tests/`](tests/), [`docs/`](docs/), [`ops/`](ops/) | Settings, regression tests, research documentation (historical plans in [`docs/planning/`](docs/planning/)), and runbooks |
 | [`storage/`](storage/) | Local summaries, model artifacts, and research outputs |
 
 ## License
 
-No license file is included in this repository. No open-source reuse license is declared; contact the owner before reusing or redistributing the code.
+This project is released under the [MIT License](LICENSE).

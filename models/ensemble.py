@@ -4,11 +4,14 @@ models/ensemble.py
 Weighted-average ensemble model combining multiple BaseModel instances.
 """
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
+
 import numpy as np
 import pandas as pd
 from loguru import logger
+
 from models.base_model import BaseModel
 
 

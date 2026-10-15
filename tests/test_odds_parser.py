@@ -6,18 +6,16 @@ Unit tests for collectors/parsers/odds_parser.py.
 No network calls, no database — pure function testing.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from collectors.parsers.odds_parser import (
     ODDS_MAX,
-    ODDS_MIN,
     OddsParseError,
     parse_events,
     validate_odds_pair,
 )
-
 
 # ---------------------------------------------------------------------------
 # Test data helpers
@@ -83,12 +81,12 @@ def test_parse_events_basic():
     assert e.bookmaker_title == "TAB"
     assert e.home_odds == 1.75
     assert e.away_odds == 2.10
-    assert e.commence_time.tzinfo == timezone.utc
+    assert e.commence_time.tzinfo == UTC
 
 
 def test_parse_events_commence_time_utc():
     events = parse_events([_make_event(commence_time="2025-03-20T08:30:00Z")], _PREFS)
-    assert events[0].commence_time == datetime(2025, 3, 20, 8, 30, 0, tzinfo=timezone.utc)
+    assert events[0].commence_time == datetime(2025, 3, 20, 8, 30, 0, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------

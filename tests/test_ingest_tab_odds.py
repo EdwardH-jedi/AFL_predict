@@ -7,10 +7,7 @@ Uses in-memory SQLite (via conftest.py). No network calls —
 TABOddsCollector is monkeypatched to return synthetic data.
 """
 
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
-
-import pytest
+from datetime import UTC, datetime
 
 from collectors.parsers.odds_parser import ParsedOddsEvent
 from db.models.matches import Match
@@ -18,12 +15,11 @@ from db.models.odds_snapshots import OddsSnapshot
 from db.models.teams import Team
 from orchestration.jobs.ingest_tab_odds import _resolve_match, _upsert_odds_snapshot
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-_NOW = datetime(2025, 3, 20, 8, 0, 0, tzinfo=timezone.utc)
+_NOW = datetime(2025, 3, 20, 8, 0, 0, tzinfo=UTC)
 
 
 def _seed_match(db, home_name="Richmond", away_name="Carlton", result=None) -> Match:
@@ -38,7 +34,7 @@ def _seed_match(db, home_name="Richmond", away_name="Carlton", result=None) -> M
         round_label="Round 1",
         home_team_id=home.id,
         away_team_id=away.id,
-        match_time=datetime(2025, 3, 20, 9, 30, tzinfo=timezone.utc),
+        match_time=datetime(2025, 3, 20, 9, 30, tzinfo=UTC),
         venue="MCG",
         external_id="squiggle-1001",
         result=result,
@@ -59,7 +55,7 @@ def _odds_event(
         external_event_id="odds-event-abc",
         home_team_name=home_name,
         away_team_name=away_name,
-        commence_time=datetime(2025, 3, 20, 8, 30, tzinfo=timezone.utc),
+        commence_time=datetime(2025, 3, 20, 8, 30, tzinfo=UTC),
         bookmaker_key=bookmaker_key,
         bookmaker_title=bookmaker_key.upper(),
         home_odds=home_odds,
@@ -141,8 +137,8 @@ class TestUpsertOddsSnapshot:
     def test_inserts_new_snapshot_on_different_day(self, db_session):
         """Snapshots on different calendar days are distinct records."""
         _seed_match(db_session)
-        day1 = datetime(2025, 3, 19, 8, 0, tzinfo=timezone.utc)
-        day2 = datetime(2025, 3, 20, 8, 0, tzinfo=timezone.utc)
+        day1 = datetime(2025, 3, 19, 8, 0, tzinfo=UTC)
+        day2 = datetime(2025, 3, 20, 8, 0, tzinfo=UTC)
         _upsert_odds_snapshot(db_session, _odds_event(), day1)
         db_session.flush()
         _upsert_odds_snapshot(db_session, _odds_event(), day2)

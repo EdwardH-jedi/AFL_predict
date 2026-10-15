@@ -6,18 +6,16 @@ Unit tests for collectors/parsers/squiggle_parser.py.
 No network calls, no database — pure function testing.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC
 
 import pytest
 
 from collectors.parsers.squiggle_parser import (
     SquiggleParseError,
+    _derive_result,
     parse_games,
     parse_teams,
-    _derive_result,
-    _parse_match_time,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures (reusable test data)
@@ -157,7 +155,7 @@ def test_parse_games_match_time_is_utc():
     games = parse_games(raw)
     mt = games[0].match_time
     assert mt is not None
-    assert mt.tzinfo == timezone.utc
+    assert mt.tzinfo == UTC
     # 19:30 AEDT (UTC+11) = 08:30 UTC
     assert mt.hour == 8
     assert mt.minute == 30

@@ -20,8 +20,8 @@ import time
 
 from loguru import logger
 
-from db.session import db_session
 from collectors.player_collector import PlayerCollector
+from db.session import db_session
 
 
 def run(season: int) -> int:

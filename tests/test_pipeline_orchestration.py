@@ -11,10 +11,7 @@ from __future__ import annotations
 import types
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from orchestration.pipeline_state import JobResult, JobSpec, run_job_with_retry
-
 
 # ---------------------------------------------------------------------------
 # Helpers: mock job modules

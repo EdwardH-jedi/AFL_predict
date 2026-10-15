@@ -16,7 +16,7 @@ Run order: first in the daily pipeline (before ingestion jobs).
 """
 
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from loguru import logger
@@ -73,7 +73,7 @@ def run() -> None:
 def build_report(now: datetime | None = None) -> dict[str, Any]:
     """Compute a fresh data-health snapshot directly from the database."""
     warnings: list[str] = []
-    now = now or datetime.now(tz=timezone.utc)
+    now = now or datetime.now(tz=UTC)
 
     with db_session() as db:
         odds_age_hours = _odds_age_hours(db, now)
@@ -137,7 +137,7 @@ def _odds_age_hours(db: Session, now: datetime) -> float | None:
         return None
     snap_at = latest.snapshot_time
     if snap_at.tzinfo is None:
-        snap_at = snap_at.replace(tzinfo=timezone.utc)
+        snap_at = snap_at.replace(tzinfo=UTC)
     return (now - snap_at).total_seconds() / 3600
 
 
@@ -152,7 +152,7 @@ def _afl_age_hours(db: Session, now: datetime) -> float | None:
         return None
     updated = latest.updated_at
     if updated.tzinfo is None:
-        updated = updated.replace(tzinfo=timezone.utc)
+        updated = updated.replace(tzinfo=UTC)
     return (now - updated).total_seconds() / 3600
 
 
@@ -193,8 +193,8 @@ def _upcoming_without_odds(db: Session, now: datetime) -> dict[str, Any]:
 def _as_utc(value: datetime) -> datetime:
     """Normalize naive DB datetimes to UTC-aware values."""
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 if __name__ == "__main__":

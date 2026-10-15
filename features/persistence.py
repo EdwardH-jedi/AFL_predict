@@ -12,7 +12,7 @@ Both are write-idempotent — re-running build_features overwrites existing rows
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -20,7 +20,6 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from db.models.match_features import MatchFeature
-
 
 # ---------------------------------------------------------------------------
 # Parquet persistence
@@ -39,7 +38,7 @@ def save_parquet(df: pd.DataFrame, output_dir: Path, season: int | None = None) 
         Path to the written file.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
     season_tag = f"_{season}" if season else ""
     path = output_dir / f"features{season_tag}_{ts}.parquet"
     df.to_parquet(path, index=False)

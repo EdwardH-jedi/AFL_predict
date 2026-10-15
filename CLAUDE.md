@@ -18,7 +18,6 @@ orchestration/       daily pipeline jobs (ingest → features → train → reco
 backtesting/         walk-forward backtests, tuner scripts
 static/dashboard.html        legacy Chart.js dashboard (live)
 static/quant-dashboard/      Quant dashboard from the Claude Design handoff
-frontend/            Vite/React/TS scaffold (Phase B placeholder, separate from quant-dashboard)
 tests/               pytest suite
 generate_predictions_json.py CSV → predictions.json converter (this file)
 serve.py             stdlib HTTP server for standalone dashboard preview

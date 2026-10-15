@@ -18,13 +18,12 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from datetime import datetime, timezone
 
 from loguru import logger
 
+from collectors.weather_collector import WeatherCollector
 from config.settings import get_settings
 from db.session import db_session
-from collectors.weather_collector import WeatherCollector
 
 settings = get_settings()
 

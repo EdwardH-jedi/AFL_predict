@@ -7,7 +7,7 @@ Uses in-memory SQLite (via conftest.py). No network calls —
 the AFLCollector is monkeypatched to return synthetic data.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,14 +15,11 @@ import pytest
 from collectors.parsers.squiggle_parser import ParsedGame, ParsedTeam
 from db.models.matches import Match
 from db.models.teams import Team
-from db.session import create_all_tables
 from orchestration.jobs.ingest_afl import (
     _upsert_game,
     _upsert_team,
-    _resolve_team,
     run,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -55,7 +52,7 @@ def _game(
         away_team_name=away_name,
         home_team_external_id=home_ext_id,
         away_team_external_id=away_ext_id,
-        match_time=match_time or datetime(2025, 3, 20, 8, 30, tzinfo=timezone.utc),
+        match_time=match_time or datetime(2025, 3, 20, 8, 30, tzinfo=UTC),
         venue="MCG",
         home_score=home_score,
         away_score=away_score,
@@ -177,7 +174,7 @@ class TestUpsertGame:
         # Simulate Squiggle correcting venue
         updated = _game()
         updated.venue = "Docklands"
-        n = _upsert_game(db_session, updated)
+        _upsert_game(db_session, updated)
         db_session.flush()
         match = db_session.query(Match).filter(Match.external_id == "1001").first()
         assert match.venue == "Docklands"
