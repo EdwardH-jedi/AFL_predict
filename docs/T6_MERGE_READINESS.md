@@ -41,8 +41,9 @@ docs must not — and now do not — claim verified predictive performance. See
 - `ruff check .` — 202 findings (style/modernization: `datetime.UTC` aliases,
   unused imports, import order, line length). Not CI-gated (no CI is
   configured), none identified as correctness defects. Known style debt.
-  *(Historical record. "Not CI-gated" was closed by PR #3, merge commit
-  `c3bee0c`; current counts are in the 2026-10-15 section below.)*
+  *(Historical record. "Not CI-gated" was closed by PR #3 (`c3bee0c`), and
+  #6 (`eeaa5e9`) cleared everything except E501; current counts are in the
+  2026-10-15 section below.)*
 - No type-check gate is configured to run in CI; `mypy` config exists in
   `pyproject.toml` (non-strict).
 
@@ -52,84 +53,75 @@ Measured on Windows 11 with Python 3.11.9 in a fresh venv built from
 `requirements-dev.txt` (ruff 0.17.0, pytest 9.1.1, pydantic 2.14.1,
 starlette 1.8.0, fastapi 0.143.1), using the env CI sets
 (`APP_ENV=development API_SECRET_KEY=ci-test-secret DB_URL=sqlite:///:memory:
-MPLBACKEND=Agg`). "main" = `c3bee0c` (PR #3 merged); "branch" = the lint
-cleanup PR that adds this section. GitHub CI results for the branch are on
-its PR, not restated here.
+MPLBACKEND=Agg`). "main" = `28ec2f4` (#6 and #4 merged; #4 changed only
+README and `.gitignore`, so code/test counts equal `eeaa5e9`). This section is
+a docs-only change; code, tests and `ci.yml` are identical to main, so every
+count below is main's. Ruff config (`pyproject.toml`) and the ruff pin were
+unchanged between `c3bee0c` and `28ec2f4`, so the Ruff columns are comparable.
 
-### CI split (from `.github/workflows/ci.yml` as merged in #3)
+### CI split (`.github/workflows/ci.yml` at main `28ec2f4`, unchanged since #6)
 
 - `tests` job: `python -m pytest tests/ -q` on Python 3.11 — blocking.
-- `lint` job, blocking: `python -m ruff check . --ignore
-  E501,E712,E741,F401,F841,I001,UP007,UP017,UP035,UP037` — gates every
-  selected (`E`, `F`, `I`, `UP`) rule that had zero findings at the #3 /
-  main `c3bee0c` baseline. On this branch UP017 and F401 also reach zero but
-  stay in the ignore list until the follow-up below.
+- `lint` job, blocking: `python -m ruff check . --ignore E501` — every
+  selected (`E`, `F`, `I`, `UP`) rule except E501 is gated.
 - `lint` job, non-blocking: `python -m ruff check . --exit-zero --statistics`
   — full debt report in the job summary.
 
-### Ruff 0.17.0 — before/after by code
+### Ruff 0.17.0 by code
 
-Commands: `python -m ruff check . --exit-zero --statistics` (totals) and
-`python -m ruff check . --select <CODE>` (per-code zero check).
+Command: `python -m ruff check . --exit-zero --statistics`.
 
-| Code | main | branch | Notes |
-|---|---:|---:|---|
-| UP017 datetime-timezone-utc | 62 | **0** | fixed (`timezone.utc` → `UTC`) |
-| F401 unused-import | 41 | **0** | fixed; see side-effect note below |
-| E501 line-too-long | 38 | 38 | out of mechanical scope |
-| I001 unsorted-imports | 29 | 3 | 3 remain in deliberately excluded files |
-| UP007 non-pep604-annotation-union | 12 | 12 | out of scope (modernization) |
-| UP035 deprecated-import | 7 | 7 | out of scope (modernization) |
-| F841 unused-variable | 5 | 5 | out of scope (removal touches statements) |
-| E712 true-false-comparison | 4 | 4 | out of scope (`tests/test_simulation.py` asserts on pandas/numpy values; rewriting changes assertion semantics) |
-| UP037 quoted-annotation | 3 | 3 | out of scope (modernization) |
-| E741 ambiguous-variable-name | 1 | 1 | out of scope (rename) |
-| **Total** | **202** | **73** | blocking command passes on both |
+| Code | `c3bee0c` (after #3) | `28ec2f4` (after #6, #4) |
+|---|---:|---:|
+| UP017 datetime-timezone-utc | 62 | 0 |
+| F401 unused-import | 41 | 0 |
+| E501 line-too-long | 38 | **38** |
+| I001 unsorted-imports | 29 | 0 |
+| UP007 non-pep604-annotation-union | 12 | 0 |
+| UP035 deprecated-import | 7 | 0 |
+| F841 unused-variable | 5 | 0 |
+| E712 true-false-comparison | 4 | 0 |
+| UP037 quoted-annotation | 3 | 0 |
+| E741 ambiguous-variable-name | 1 | 0 |
+| **Total** | **202** | **38** |
 
-Remaining I001 (excluded on purpose, unchanged):
-- `models/ensemble.py` — model code is outside this cleanup's ownership.
-- `db/models/__init__.py` — documents "Order matters" for model registration.
-- `db/migrations/env.py` — the sort would separate the `import db.models`
-  registration import from its explanatory comment block.
+The cleanup was done by #6. An earlier revision of PR #5 cleared
+UP017/F401/I001 only (202 → 73 at `c3bee0c`); #6 superseded it.
 
-Only Ruff's safe fixes were applied (no `--unsafe-fixes`), to an explicit
-file list. Excluded from editing: `models/**`,
-`orchestration/jobs/train_models.py`,
-`orchestration/jobs/generate_recommendations.py`, `api/routes/fixtures.py`,
-`tests/test_fixtures_config.py`, plus the two `db` files above. One removed
-F401 looks like a registration import: `DailyPipelineRun` in
-`tests/test_live_readiness.py`. It is redundant because `db/models/__init__.py`
-imports it whenever any `db.models.*` module is imported.
-
-Follow-up (not done here; `ci.yml` is owned by the CI PR and needs separate
-authorization): **UP017 and F401 are now at 0** and can be removed from the
-blocking `--ignore` list and the inline debt comment in `ci.yml`.
+E501 is 38, not the 37 in the `ci.yml` comment and #6's description. #6
+measured 37 at its first commit `d414155`; its later commit `916d8b8` added
+`tests/test_quant_dashboard_static.py:45` (103 > 100). Main CI run
+38709210297 also reports "Found 38 errors". The `ci.yml` comment is one
+stale; correcting it belongs to the `ci.yml` owner.
 
 ### pytest
 
 | Tree | Result |
 |---|---|
-| main `c3bee0c` | 314 passed, 1 skipped, 3 warnings |
-| branch | 314 passed, 1 skipped, 3 warnings (no change) |
+| main `c3bee0c` (after #3) | 314 passed, 1 skipped, 3 warnings |
+| main `eeaa5e9` (after #6) | 315 passed, 1 skipped, 3 warnings |
+| main `28ec2f4` (after #4) | **315 passed, 1 skipped, 3 warnings** |
 
-314 = the historical 313 plus the backtest-summary ensemble-weights contract
-test (commit `36d1669`). The skip is the same by-design skip as 2026-08-25
-(`tests/test_live_readiness.py:232`, no critical TODOs defined). Warnings, identical
-on both trees:
+315 = the historical 313, plus the backtest-summary ensemble-weights contract
+test (`36d1669`), plus #6's
+`test_quant_dashboard_badge_distinguishes_demo_mixed_live`. The skip is the
+same by-design skip as 2026-08-25 (`tests/test_live_readiness.py:232`, no
+critical TODOs defined). Warnings:
 1. `PydanticDeprecatedSince20` — class-based `config` in
-   `api/routes/fixtures.py:12`. Addressed by PR #2 (OPEN at `7d56af8` when
-   this was written; it reports 317 passed, 1 skipped, 1 warning on its branch).
+   `api/routes/fixtures.py:12`. Addressed by PR #2 (OPEN, pending, at
+   `85d2bcf` when this was written).
 2. `PydanticDeprecatedSince211` — instance access to `model_fields` at
-   `tests/test_dashboard_contract.py:146`. Not covered by any open PR; outside
-   mechanical lint scope. Open item.
+   `tests/test_dashboard_contract.py:146`. Not covered by any open PR. Open
+   item.
 3. `StarletteDeprecationWarning` — `httpx` with `starlette.testclient`, raised
    from the installed fastapi/starlette versions, not repository code. It
-   depends on the resolved package versions, which is why other environments
-   (e.g. a Python 3.12.10 env reporting 2 warnings) can count differently.
+   depends on the resolved package versions, so other environments can count
+   differently (a Python 3.12.10 env reported 2 warnings).
 
-Related open PR: README on main `c3bee0c` still says "Ruff is a separate
-local check", which is stale since #3. #4 (OPEN, pending, at `53c1993`)
-removes that sentence; this PR does not touch README.
+README at main `28ec2f4` (after #4 merged) describes the Ruff CI gate in
+"Tests and verification", but its stack table still says "local Ruff tooling;
+current CI runs the Python regression suite". #4 did not change that row and
+no open PR covers it. Open item.
 
 ## Issues found and fixed in this pass
 
