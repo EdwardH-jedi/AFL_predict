@@ -6,7 +6,7 @@ AFL Predict is a paper-trading research system for Australian Rules Football hea
 
 ## Engineering highlights
 
-- **Leakage controls:** features are built only from pre-match data, with [timestamp leakage checks](features/validators.py) on every feature row
+- **Leakage controls:** odds snapshots use a pre-kickoff cutoff; [result-column checks](features/validators.py) flag populated outcomes for future matches. These checks log issues rather than reject rows; weather and historical-lineup provenance remain limitations below.
 - **Walk-forward backtests:** [expanding/rolling temporal splits](backtesting/splits.py) enforce train-before-test order, with [split tests](tests/test_splits.py); scored by Brier score, log loss, and calibration error
 - **Calibration:** per-model [isotonic calibration](models/calibrated_model.py) and [calibration-bin diagnostics](backtesting/calibration.py) feed a weighted ensemble
 - **Alembic migrations:** Alembic owns the schema; a [fresh-database smoke test](tests/test_alembic_fresh_db.py) checks the migration chain
@@ -53,9 +53,11 @@ Recommendation generation hard-codes `paper_trade=True`.
 | Database | SQLite for local development; PostgreSQL configuration supported |
 | Research | pandas, pyarrow, scikit-learn, XGBoost, statsmodels |
 | Served dashboard | React/JSX static assets mounted by FastAPI, with CDN-loaded runtime dependencies |
-| Checks | pytest and local Ruff tooling; current CI runs the Python regression suite |
+| Checks | pytest regression suite and blocking Ruff lint (E501 deferred) in CI |
 
 Data flows from `collectors/` through `features/` and `models/`, then into predictions, paper recommendations, evaluation, and API responses. `orchestration/` coordinates jobs and summaries. Alembic owns database schema changes.
+
+The research path is ingestion → database records → `DatasetBuilder` feature rows → parquet snapshots → temporal training/calibration → saved model artifacts → prediction and paper-recommendation records. Walk-forward evaluation fits individual models on earlier seasons and scores the next season. Its split guard compares UTC instants and rejects folds containing missing or invalid timestamps; naive database timestamps are treated as UTC. Calibrated training uses separate earlier training, calibration, and final validation seasons when enough seasons exist. The dashboard overlays are a separate presentation path, not evidence that this pipeline has run successfully.
 
 ## Local setup
 
@@ -186,3 +188,4 @@ CI does not run research ingestion/training, send Discord alerts, or establish p
 3. **Historical weather has look-ahead risk.** The feature path uses observed kickoff conditions rather than forecasts available before a match, creating an optimistic evaluation risk and train/serve mismatch. See the explicit exception in [Backtesting](docs/backtesting.md).
 4. **Reproduction needs external inputs.** Historical numbers in [ACCURACY_PLAN.md](docs/planning/ACCURACY_PLAN.md) are preliminary snapshots. A defensible comparison needs a versioned dataset/acquisition record, temporal splits, feature cutoffs, model configuration, per-match predictions, and aggregate metrics. None of the demo dashboard numbers fill that gap.
 5. **Scope is limited.** Research focuses on H2H markets and available data sources; the backtest simulation does not model closing-line movement. Readiness checks and simulated returns are not proof of profitable real-world execution.
+6. **Feature provenance is incomplete.** Historical player lineups with no `announced_at` timestamp are currently admitted by the extractor, so their pre-match availability is unverified. Result-column checks only flag outcomes populated for future matches and do not prove every historical feature was available at prediction time. Naive timestamps must already represent UTC before storage; the split guard cannot recover a timezone offset discarded during ingestion.

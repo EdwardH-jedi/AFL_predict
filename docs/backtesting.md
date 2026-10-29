@@ -34,7 +34,7 @@ predict that match.**
 | BookmakerExtractor      | Only `snapshot_time < match_time` odds snapshots are used             |
 | RestDaysExtractor       | Uses `match_time` only (no result information)                        |
 | Temporal split          | Training data: all seasons before the test season                     |
-| Split assertion         | `max(train.match_time) < min(test.match_time)` — raises `LeakageError` on violation |
+| Split assertion         | UTC-normalized `max(train.match_time) < min(test.match_time)`; missing/invalid timestamps or overlap raise `LeakageError` |
 
 ### What leakage looks like (and why it matters)
 
@@ -50,6 +50,14 @@ will be artifically optimistic:
 The `features/validators.py` leakage checks will log `ERROR`-level messages
 if violations are detected during `build_features`. Any non-zero leakage count
 must be investigated and fixed before trusting results.
+
+The result-column guard compares aware timestamps as UTC instants and treats
+naive database values as UTC. Missing outcomes (`None`, `NaN`, `pd.NA`) are not
+populated results. This guard is advisory and only checks future-match outcomes;
+it does not certify historical feature availability. Historical player lineups
+with a null `announced_at` are admitted by the current extractor and have
+unverified pre-match provenance. Walk-forward folds fail closed when any row's
+timestamp is missing or invalid; repair the source timestamps before evaluation.
 
 ### Known deviation: historical weather features
 

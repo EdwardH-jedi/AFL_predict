@@ -18,7 +18,9 @@ validators for user input.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+
+import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Leakage guards
@@ -39,23 +41,21 @@ def check_leakage(row: dict, match_time: datetime | None) -> list[str]:
 
     Args:
         row:        Feature dict for one match.
-        match_time: The match's scheduled time (may be naive or UTC-aware).
-                    SQLite returns naive datetimes; aware datetimes are also handled.
+        match_time: Scheduled time. Naive values are assumed to be UTC (SQLite);
+                    aware values are converted to UTC before comparison.
 
     Returns:
         List of issue strings (empty if clean).
     """
     issues: list[str] = []
-    # Use naive UTC to match SQLite's naive datetime output.
-    # SQLite strips tzinfo on storage, so match_time is always naive when
-    # read back from the DB — comparing it to an aware datetime raises TypeError.
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
 
     # For a future match, home_win should not be set
-    # Strip tzinfo defensively in case match_time came from a non-SQLite source.
-    mt = match_time.replace(tzinfo=None) if match_time is not None else None
+    mt = match_time
+    if mt is not None:
+        mt = mt.replace(tzinfo=UTC) if mt.tzinfo is None else mt.astimezone(UTC)
     if mt is not None and mt > now:
-        if row.get("home_win") is not None:
+        if pd.notna(row.get("home_win")):
             issues.append(
                 f"Leakage: home_win={row['home_win']} is set for a future match "
                 f"(match_time={mt.isoformat()})."
@@ -67,7 +67,7 @@ def check_leakage(row: dict, match_time: datetime | None) -> list[str]:
     if mt is not None and mt > now:
         for col in _RESULT_COLUMNS:
             val = row.get(col)
-            if val is not None:
+            if pd.notna(val):
                 issues.append(
                     f"Leakage: column {col!r} is populated for a future match "
                     f"(value={val!r}, match_time={mt.isoformat()})."

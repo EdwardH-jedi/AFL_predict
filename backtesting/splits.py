@@ -167,16 +167,29 @@ def _assert_no_leakage(
     """
     Assert that no training data is newer than the earliest test data.
 
-    Uses match_time for the comparison; rows without match_time are ignored.
+    Compare UTC instants. Naive timestamps use the database's UTC convention.
+    Missing or invalid timestamps cannot establish ordering and reject the fold.
 
     Raises:
-        LeakageError: If any training timestamp >= any test timestamp.
+        LeakageError: If timestamps are unverifiable or training overlaps testing.
     """
-    train_times = train_df["match_time"].dropna()
-    test_times = test_df["match_time"].dropna()
+    times = []
+    for label, frame in (("train", train_df), ("test", test_df)):
+        try:
+            timestamps = pd.to_datetime(frame["match_time"], utc=True, format="mixed")
+        except (TypeError, ValueError) as exc:
+            raise LeakageError(
+                f"Invalid {label} timestamp in fold {fold_label!r}; "
+                "temporal order cannot be verified."
+            ) from exc
+        if timestamps.empty or timestamps.isna().any():
+            raise LeakageError(
+                f"Missing {label} timestamp in fold {fold_label!r}; "
+                "temporal order cannot be verified."
+            )
+        times.append(timestamps)
 
-    if train_times.empty or test_times.empty:
-        return  # cannot check without timestamps
+    train_times, test_times = times
 
     train_max = train_times.max()
     test_min = test_times.min()
