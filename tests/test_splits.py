@@ -163,10 +163,38 @@ class TestLeakageDetection:
         with pytest.raises(LeakageError):
             _assert_no_leakage(train, test, "2022")
 
-    def test_empty_timestamps_skips_check(self):
+    def test_empty_timestamps_cannot_establish_order(self):
         train = pd.DataFrame({"match_id": [1], "season": [2021], "match_time": [None], "home_win": [1]})
         test = pd.DataFrame({"match_id": [2], "season": [2022], "match_time": [None], "home_win": [1]})
-        _assert_no_leakage(train, test, "2022")  # should not raise
+        with pytest.raises(LeakageError, match="timestamp"):
+            _assert_no_leakage(train, test, "2022")
+
+    @pytest.mark.parametrize("missing", [None, pd.NaT, "not-a-date"])
+    @pytest.mark.parametrize("side", ["train", "test"])
+    def test_any_unverifiable_timestamp_rejects_fold(self, missing, side):
+        train = pd.DataFrame({"match_time": ["2021-04-01", "2021-05-01"]})
+        test = pd.DataFrame({"match_time": ["2022-04-01", "2022-05-01"]})
+        (train if side == "train" else test).loc[1, "match_time"] = missing
+        with pytest.raises(LeakageError, match="timestamp"):
+            _assert_no_leakage(train, test, "2022")
+
+    def test_offsets_compare_instants_not_strings(self):
+        train = pd.DataFrame({"match_time": ["2026-01-01T00:30:00-10:00"]})
+        test = pd.DataFrame({"match_time": ["2026-01-01T12:00:00+11:00"]})
+        with pytest.raises(LeakageError, match="overlap"):
+            _assert_no_leakage(train, test, "2026")
+
+    def test_mixed_naive_and_aware_utc_are_comparable(self):
+        train = pd.DataFrame({"match_time": [datetime(2021, 1, 1)]})
+        test = pd.DataFrame({"match_time": [datetime(2022, 1, 1, tzinfo=UTC)]})
+        _assert_no_leakage(train, test, "2022")
+
+    @pytest.mark.parametrize("splitter", [expanding_window_splits, rolling_window_splits])
+    def test_public_splitter_rejects_missing_timestamp(self, splitter):
+        df = _make_df({s: [f"{s}-04-01"] for s in range(2019, 2024)})
+        df.loc[0, "match_time"] = pd.NaT
+        with pytest.raises(LeakageError, match="timestamp"):
+            splitter(df)
 
 
 # ---------------------------------------------------------------------------
